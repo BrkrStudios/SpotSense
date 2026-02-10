@@ -19,52 +19,108 @@ enum ParkingLotLayout {
     static let lineColor = Color(red: 0.85, green: 0.85, blue: 0.80)
     static let laneColor = Color(red: 0.22, green: 0.22, blue: 0.24)
     static let handicapBlue = Color(red: 0.2, green: 0.4, blue: 0.9)
-    static let carColors: [Color] = [
-        Color(red: 0.8, green: 0.1, blue: 0.1),   // red
-        Color(red: 0.2, green: 0.2, blue: 0.7),   // blue
-        Color(red: 0.6, green: 0.6, blue: 0.6),   // silver
-        Color(red: 0.1, green: 0.1, blue: 0.1),   // black
-        Color(red: 0.9, green: 0.9, blue: 0.85),  // white
-    ]
+    static let spotAvailable = Color(red: 0.2, green: 0.75, blue: 0.3)
+    static let spotOccupied = Color(red: 0.85, green: 0.15, blue: 0.15)
 }
 
-// MARK: - Content View
+// MARK: - Parking Lot Detail View
 
-struct ContentView: View {
+struct ParkingLotDetailView: View {
     @StateObject private var parkingLot = ParkingLotViewModel()
+    @State private var currentScale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var currentOffset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    @State private var scaleAnchor: UnitPoint = .center
+    @State private var isPinching: Bool = false
+    @State private var currentRotation: Angle = .zero
+    @State private var lastRotation: Angle = .zero
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                // Stats Header
-                HStack(spacing: 20) {
-                    StatCard(title: "Available", value: "\(parkingLot.availableCount)", color: .green)
-                    StatCard(title: "Occupied", value: "\(parkingLot.occupiedCount)", color: .red)
-                    StatCard(title: "Handicap", value: "\(parkingLot.handicapAvailableCount)", color: .blue)
-                }
-                .padding(.horizontal)
-
-                // Parking Lot
-                ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                    ParkingLotView(parkingLot: parkingLot)
-                        .padding(12)
-                }
-                .background(Color.black)
-                .cornerRadius(12)
-                .padding(.horizontal)
-
-                // Legend
-                LegendView()
-                    .padding(.horizontal)
-
-                Spacer()
+        VStack(spacing: 16) {
+            // Stats Header
+            HStack(spacing: 20) {
+                StatCard(title: "Available", value: "\(parkingLot.availableCount)", color: .green)
+                StatCard(title: "Occupied", value: "\(parkingLot.occupiedCount)", color: .red)
+                StatCard(title: "Handicap", value: "\(parkingLot.handicapAvailableCount)", color: .blue)
             }
-            .navigationTitle("SpotSense")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Reset") {
-                        parkingLot.reset()
-                    }
+            .padding(.horizontal)
+
+            // Parking Lot - Zoomable, Pannable & Rotatable
+            GeometryReader { geo in
+                ParkingLotView(parkingLot: parkingLot)
+                    .padding(12)
+                    .rotationEffect(currentRotation)
+                    .scaleEffect(currentScale, anchor: scaleAnchor)
+                    .offset(currentOffset)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                isPinching = true
+                                let newScale = lastScale * value
+                                currentScale = min(max(newScale, 0.5), 4.0)
+                            }
+                            .onEnded { value in
+                                lastScale = currentScale
+                                isPinching = false
+                            }
+                    )
+                    .simultaneousGesture(
+                        RotationGesture()
+                            .onChanged { angle in
+                                currentRotation = lastRotation + angle
+                            }
+                            .onEnded { angle in
+                                lastRotation = currentRotation
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture()
+                            .onChanged { value in
+                                if isPinching {
+                                    // While pinching, update anchor instead of panning
+                                    scaleAnchor = UnitPoint(
+                                        x: value.startLocation.x / geo.size.width,
+                                        y: value.startLocation.y / geo.size.height
+                                    )
+                                } else {
+                                    currentOffset = CGSize(
+                                        width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height
+                                    )
+                                }
+                            }
+                            .onEnded { value in
+                                if !isPinching {
+                                    lastOffset = currentOffset
+                                }
+                            }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(Color.black)
+            .clipped()
+            .cornerRadius(12)
+            .padding(.horizontal)
+
+            // Legend
+            LegendView()
+                .padding(.horizontal)
+
+            Spacer()
+        }
+        .navigationTitle("Parking Lot 3")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Reset") {
+                    parkingLot.reset()
+                    currentScale = 1.0
+                    lastScale = 1.0
+                    currentOffset = .zero
+                    lastOffset = .zero
+                    scaleAnchor = .center
+                    currentRotation = .zero
+                    lastRotation = .zero
                 }
             }
         }
@@ -146,9 +202,14 @@ struct ParkingSpotView: View {
     let col: Int
     let facingUp: Bool
 
-    var carColor: Color {
-        let hash = (row &* 31 &+ col &* 17) % ParkingLotLayout.carColors.count
-        return ParkingLotLayout.carColors[abs(hash)]
+    var indicatorColor: Color {
+        if spot.status == .occupied {
+            return ParkingLotLayout.spotOccupied
+        } else if spot.isHandicap {
+            return ParkingLotLayout.handicapBlue
+        } else {
+            return ParkingLotLayout.spotAvailable
+        }
     }
 
     var body: some View {
@@ -163,14 +224,17 @@ struct ParkingSpotView: View {
                 isLastColumn: col == ParkingLotMap.spotsPerRow - 1
             )
 
-            // Handicap floor marking (visible when empty)
-            if spot.isHandicap && spot.status != .occupied {
-                HandicapFloorMarkingView()
-            }
+            // Spot status indicator
+            RoundedRectangle(cornerRadius: 4)
+                .fill(indicatorColor)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 4)
 
-            // Car shape when occupied
-            if spot.status == .occupied {
-                CarShapeView(color: carColor, facingUp: facingUp, isHandicap: spot.isHandicap)
+            // Handicap icon overlay
+            if spot.isHandicap {
+                Image(systemName: "figure.roll")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
             }
         }
         .frame(width: ParkingLotLayout.spotWidth, height: ParkingLotLayout.spotHeight)
@@ -224,79 +288,6 @@ struct ParkingLineOverlay: View {
     }
 }
 
-// MARK: - Car Shape View
-
-struct CarShapeView: View {
-    let color: Color
-    let facingUp: Bool
-    let isHandicap: Bool
-
-    private let inset: CGFloat = 4
-
-    var body: some View {
-        ZStack {
-            // Car body
-            RoundedRectangle(cornerRadius: 4)
-                .fill(color)
-                .padding(.horizontal, inset)
-                .padding(.vertical, inset + 2)
-
-            // Windshield (darker area at front of car)
-            VStack(spacing: 0) {
-                if facingUp {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(white: 0.3, opacity: 0.6))
-                        .frame(height: 8)
-                        .padding(.horizontal, inset + 3)
-                        .padding(.top, inset + 3)
-                    Spacer(minLength: 0)
-                } else {
-                    Spacer(minLength: 0)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(white: 0.3, opacity: 0.6))
-                        .frame(height: 8)
-                        .padding(.horizontal, inset + 3)
-                        .padding(.bottom, inset + 3)
-                }
-            }
-
-            // Handicap placard indicator
-            if isHandicap {
-                VStack(spacing: 0) {
-                    if facingUp {
-                        Spacer(minLength: 0)
-                        Image(systemName: "figure.roll")
-                            .font(.system(size: 8))
-                            .foregroundColor(.white)
-                            .padding(.bottom, inset + 4)
-                    } else {
-                        Image(systemName: "figure.roll")
-                            .font(.system(size: 8))
-                            .foregroundColor(.white)
-                            .padding(.top, inset + 4)
-                        Spacer(minLength: 0)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Handicap Floor Marking View
-
-struct HandicapFloorMarkingView: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(ParkingLotLayout.handicapBlue.opacity(0.5))
-                .padding(6)
-
-            Image(systemName: "figure.roll")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.white)
-        }
-    }
-}
 
 // MARK: - Driving Lane View
 
@@ -361,8 +352,8 @@ struct StatCard: View {
 struct LegendView: View {
     var body: some View {
         HStack(spacing: 16) {
-            LegendItem(color: ParkingLotLayout.asphaltColor, label: "Available", showLines: true)
-            LegendItem(color: .red, label: "Occupied", isCar: true)
+            LegendItem(color: ParkingLotLayout.spotAvailable, label: "Available")
+            LegendItem(color: ParkingLotLayout.spotOccupied, label: "Occupied")
             LegendItem(color: ParkingLotLayout.handicapBlue, label: "Handicap")
             LegendItem(color: ParkingLotLayout.laneColor, label: "Lane")
         }
@@ -373,43 +364,12 @@ struct LegendView: View {
 struct LegendItem: View {
     let color: Color
     let label: String
-    var showLines: Bool = false
-    var isCar: Bool = false
 
     var body: some View {
         HStack(spacing: 4) {
-            if isCar {
-                // Show a tiny car shape
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(color)
-                    .frame(width: 10, height: 14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 2)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
-                    )
-            } else if showLines {
-                // Show asphalt with parking lines
-                ZStack {
-                    Rectangle()
-                        .fill(color)
-                        .frame(width: 14, height: 14)
-                    HStack(spacing: 0) {
-                        Rectangle()
-                            .fill(ParkingLotLayout.lineColor)
-                            .frame(width: 1)
-                        Spacer(minLength: 0)
-                        Rectangle()
-                            .fill(ParkingLotLayout.lineColor)
-                            .frame(width: 1)
-                    }
-                    .frame(width: 14, height: 14)
-                }
-            } else {
-                Rectangle()
-                    .fill(color)
-                    .frame(width: 12, height: 12)
-                    .cornerRadius(2)
-            }
+            RoundedRectangle(cornerRadius: 3)
+                .fill(color)
+                .frame(width: 12, height: 12)
             Text(label)
                 .foregroundColor(.secondary)
         }
@@ -457,5 +417,7 @@ class ParkingLotViewModel: ObservableObject {
 }
 
 #Preview {
-    ContentView()
+    NavigationStack {
+        ParkingLotDetailView()
+    }
 }

@@ -138,7 +138,7 @@ class ParkingLotMap {
         return count
     }
 
-    /// Get total occupied spots
+    /// Get total occupied spots 
     func occupiedSpotCount() -> Int {
         var count = 0
         for row in parkingRowIndices {
