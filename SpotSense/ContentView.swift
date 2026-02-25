@@ -31,83 +31,15 @@ struct ParkingLotDetailView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var currentOffset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
-    @State private var scaleAnchor: UnitPoint = .center
-    @State private var isPinching: Bool = false
     @State private var currentRotation: Angle = .zero
     @State private var lastRotation: Angle = .zero
+    @State private var pinchCenter: CGPoint? = nil
+    @State private var isPinching: Bool = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Stats Header
-            HStack(spacing: 20) {
-                StatCard(title: "Available", value: "\(parkingLot.availableCount)", color: .green)
-                StatCard(title: "Occupied", value: "\(parkingLot.occupiedCount)", color: .red)
-                StatCard(title: "Handicap", value: "\(parkingLot.handicapAvailableCount)", color: .blue)
-            }
-            .padding(.horizontal)
-
-            // Parking Lot - Zoomable, Pannable & Rotatable
-            GeometryReader { geo in
-                ParkingLotView(parkingLot: parkingLot)
-                    .padding(12)
-                    .rotationEffect(currentRotation)
-                    .scaleEffect(currentScale, anchor: scaleAnchor)
-                    .offset(currentOffset)
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { value in
-                                isPinching = true
-                                let newScale = lastScale * value
-                                currentScale = min(max(newScale, 0.5), 4.0)
-                            }
-                            .onEnded { value in
-                                lastScale = currentScale
-                                isPinching = false
-                            }
-                    )
-                    .simultaneousGesture(
-                        RotationGesture()
-                            .onChanged { angle in
-                                currentRotation = lastRotation + angle
-                            }
-                            .onEnded { angle in
-                                lastRotation = currentRotation
-                            }
-                    )
-                    .simultaneousGesture(
-                        DragGesture()
-                            .onChanged { value in
-                                if isPinching {
-                                    // While pinching, update anchor instead of panning
-                                    scaleAnchor = UnitPoint(
-                                        x: value.startLocation.x / geo.size.width,
-                                        y: value.startLocation.y / geo.size.height
-                                    )
-                                } else {
-                                    currentOffset = CGSize(
-                                        width: lastOffset.width + value.translation.width,
-                                        height: lastOffset.height + value.translation.height
-                                    )
-                                }
-                            }
-                            .onEnded { value in
-                                if !isPinching {
-                                    lastOffset = currentOffset
-                                }
-                            }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .background(Color.black)
-            .clipped()
-            .cornerRadius(12)
-            .padding(.horizontal)
-
-            // Legend
-            LegendView()
-                .padding(.horizontal)
-
-            Spacer()
+        ZStack {
+            mapLayer
+            overlayLayer
         }
         .navigationTitle("Parking Lot 3")
         .toolbar {
@@ -118,12 +50,94 @@ struct ParkingLotDetailView: View {
                     lastScale = 1.0
                     currentOffset = .zero
                     lastOffset = .zero
-                    scaleAnchor = .center
                     currentRotation = .zero
                     lastRotation = .zero
                 }
             }
         }
+    }
+
+    // MARK: - Map Layer (Full-Screen)
+
+    private var mapLayer: some View {
+        GeometryReader { geo in
+            let viewCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+
+            ParkingLotView(parkingLot: parkingLot)
+                .rotationEffect(currentRotation)
+                .scaleEffect(currentScale, anchor: .center)
+                .offset(currentOffset)
+                .simultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            isPinching = true
+                            let newScale = min(max(lastScale * value, 0.5), 4.0)
+                            let delta = newScale / currentScale
+                            // Use pinch location if available, otherwise zoom from center
+                            let anchor = pinchCenter ?? viewCenter
+                            let anchorOffset = CGSize(
+                                width: anchor.x - viewCenter.x,
+                                height: anchor.y - viewCenter.y
+                            )
+                            currentOffset = CGSize(
+                                width: anchorOffset.width * (1 - delta) + currentOffset.width * delta,
+                                height: anchorOffset.height * (1 - delta) + currentOffset.height * delta
+                            )
+                            currentScale = newScale
+                        }
+                        .onEnded { _ in
+                            isPinching = false
+                            pinchCenter = nil
+                            lastScale = currentScale
+                            lastOffset = currentOffset
+                        }
+                )
+                .simultaneousGesture(
+                    RotationGesture()
+                        .onChanged { angle in
+                            currentRotation = lastRotation + angle
+                        }
+                        .onEnded { angle in
+                            lastRotation = currentRotation
+                        }
+                )
+                .simultaneousGesture(
+                    DragGesture()
+                        .onChanged { value in
+                            pinchCenter = value.startLocation
+                            if !isPinching {
+                                currentOffset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                        }
+                        .onEnded { _ in
+                            if !isPinching {
+                                lastOffset = currentOffset
+                            }
+                        }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(ParkingLotLayout.asphaltColor)
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    // MARK: - Overlay Layer (Floating UI)
+
+    private var overlayLayer: some View {
+        VStack {
+            HStack(spacing: 12) {
+                StatCircle(value: parkingLot.availableCount, color: ParkingLotLayout.spotAvailable, icon: "car.fill")
+                StatCircle(value: parkingLot.occupiedCount, color: ParkingLotLayout.spotOccupied, icon: "car.fill")
+                StatCircle(value: parkingLot.handicapAvailableCount, color: ParkingLotLayout.handicapBlue, icon: "figure.roll")
+            }
+            .padding(.top, 8)
+
+            Spacer()
+        }
+        .padding(.horizontal)
     }
 }
 
@@ -323,55 +337,29 @@ struct DashedCenterLine: View {
     }
 }
 
-// MARK: - Stat Card
+// MARK: - Stat Circle
 
-struct StatCard: View {
-    let title: String
-    let value: String
+struct StatCircle: View {
+    let value: Int
     let color: Color
+    let icon: String
 
     var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
+        VStack(spacing: 2) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.85))
+                    .frame(width: 52, height: 52)
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+
+                Text("\(value)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+
+            Image(systemName: icon)
+                .font(.system(size: 10))
                 .foregroundColor(color)
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(color.opacity(0.1))
-        .cornerRadius(8)
-    }
-}
-
-// MARK: - Legend View
-
-struct LegendView: View {
-    var body: some View {
-        HStack(spacing: 16) {
-            LegendItem(color: ParkingLotLayout.spotAvailable, label: "Available")
-            LegendItem(color: ParkingLotLayout.spotOccupied, label: "Occupied")
-            LegendItem(color: ParkingLotLayout.handicapBlue, label: "Handicap")
-            LegendItem(color: ParkingLotLayout.laneColor, label: "Lane")
-        }
-        .font(.caption)
-    }
-}
-
-struct LegendItem: View {
-    let color: Color
-    let label: String
-
-    var body: some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(color)
-                .frame(width: 12, height: 12)
-            Text(label)
-                .foregroundColor(.secondary)
         }
     }
 }
@@ -420,4 +408,5 @@ class ParkingLotViewModel: ObservableObject {
     NavigationStack {
         ParkingLotDetailView()
     }
+    .environmentObject(AppSettings())
 }

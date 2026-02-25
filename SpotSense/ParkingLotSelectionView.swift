@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct ParkingLotSelectionView: View {
+    @EnvironmentObject var appSettings: AppSettings
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
@@ -35,6 +37,7 @@ struct ParkingLotSelectionView: View {
             }
             .padding(.horizontal)
             .navigationTitle("SpotSense")
+            .background((appSettings.theme.backgroundColor ?? Color.clear).ignoresSafeArea())
         }
     }
 }
@@ -74,4 +77,5 @@ struct ParkingLotCard: View {
 
 #Preview {
     ParkingLotSelectionView()
+        .environmentObject(AppSettings())
 }
