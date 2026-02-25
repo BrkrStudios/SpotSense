@@ -161,6 +161,57 @@ class ParkingLotMap {
         return handicapPositions.filter { map[$0.row][$0.col].status == .handicap }.count
     }
 
+    // MARK: - Spot Numbering
+
+    static let parkingRowOrder = [0, 1, 3, 4, 6, 7, 9, 10, 12, 13]
+    static let totalNumberedSpots = parkingRowOrder.count * spotsPerRow  // 220
+
+    /// Convert a spot number (1-220) to (row, col)
+    static func position(forSpotNumber spotNumber: Int) -> (row: Int, col: Int)? {
+        guard spotNumber >= 1 && spotNumber <= totalNumberedSpots else { return nil }
+        let zeroIndexed = spotNumber - 1
+        let parkingRowIndex = zeroIndexed / spotsPerRow
+        let col = zeroIndexed % spotsPerRow
+        let row = parkingRowOrder[parkingRowIndex]
+        return (row, col)
+    }
+
+    /// Convert (row, col) to spot number (1-220), returns nil for driving lanes
+    static func spotNumber(forRow row: Int, col: Int) -> Int? {
+        guard let parkingRowIndex = parkingRowOrder.firstIndex(of: row) else { return nil }
+        return parkingRowIndex * spotsPerRow + col + 1
+    }
+
+    /// Calculate the center point of a spot in ParkingLotView coordinates
+    static func centerPoint(forRow row: Int, col: Int) -> CGPoint {
+        let x = CGFloat(col) * ParkingLotLayout.spotWidth + ParkingLotLayout.spotWidth / 2
+
+        var y: CGFloat = 0
+        let aisles: [(top: Int, bottom: Int, hasLane: Bool)] = [
+            (0, 1, true), (3, 4, true), (6, 7, true), (9, 10, true), (12, 13, false)
+        ]
+
+        for aisle in aisles {
+            if row == aisle.top {
+                y += ParkingLotLayout.spotHeight / 2
+                return CGPoint(x: x, y: y)
+            }
+            y += ParkingLotLayout.spotHeight
+
+            if row == aisle.bottom {
+                y += ParkingLotLayout.spotHeight / 2
+                return CGPoint(x: x, y: y)
+            }
+            y += ParkingLotLayout.spotHeight
+
+            if aisle.hasLane {
+                y += ParkingLotLayout.laneHeight
+            }
+        }
+
+        return CGPoint(x: x, y: y)
+    }
+
     // MARK: - Debug
 
     /// Print the map to console (for debugging)

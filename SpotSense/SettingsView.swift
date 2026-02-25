@@ -25,6 +25,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Parking") {
+                    Button(role: .destructive) {
+                        appSettings.shouldResetParkingData = true
+                    } label: {
+                        Label("Reset Parking Data", systemImage: "arrow.counterclockwise")
+                    }
+                }
+
                 Section("About") {
                     HStack {
                         Label("Version", systemImage: "info.circle")

@@ -43,6 +43,7 @@ class AppSettings: ObservableObject {
             UserDefaults.standard.set(theme.rawValue, forKey: "appTheme")
         }
     }
+    @Published var shouldResetParkingData: Bool = false
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue

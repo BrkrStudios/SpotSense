@@ -26,7 +26,10 @@ enum ParkingLotLayout {
 // MARK: - Parking Lot Detail View
 
 struct ParkingLotDetailView: View {
+    @EnvironmentObject var appSettings: AppSettings
     @StateObject private var parkingLot = ParkingLotViewModel()
+    @State private var isSearching: Bool = false
+    @State private var searchText: String = ""
     @State private var currentScale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var currentOffset: CGSize = .zero
@@ -40,20 +43,84 @@ struct ParkingLotDetailView: View {
         ZStack {
             mapLayer
             overlayLayer
+
+            if isSearching {
+                searchOverlay
+            }
         }
         .navigationTitle("Parking Lot 3")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Reset") {
-                    parkingLot.reset()
-                    currentScale = 1.0
-                    lastScale = 1.0
-                    currentOffset = .zero
-                    lastOffset = .zero
-                    currentRotation = .zero
-                    lastRotation = .zero
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        isSearching.toggle()
+                        if !isSearching { searchText = "" }
+                    }
+                } label: {
+                    Image(systemName: "magnifyingglass")
                 }
             }
+        }
+        .onChange(of: appSettings.shouldResetParkingData) { _, newValue in
+            if newValue {
+                resetView()
+                appSettings.shouldResetParkingData = false
+            }
+        }
+        .onAppear {
+            if appSettings.shouldResetParkingData {
+                resetView()
+                appSettings.shouldResetParkingData = false
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var isValidSpotNumber: Bool {
+        guard let num = Int(searchText) else { return false }
+        return num >= 1 && num <= ParkingLotMap.totalNumberedSpots
+    }
+
+    private func resetView() {
+        parkingLot.reset()
+        currentScale = 1.0
+        lastScale = 1.0
+        currentOffset = .zero
+        lastOffset = .zero
+        currentRotation = .zero
+        lastRotation = .zero
+    }
+
+    private func navigateToSpot() {
+        guard let spotNum = Int(searchText),
+              let position = ParkingLotMap.position(forSpotNumber: spotNum) else { return }
+
+        let spotCenter = ParkingLotMap.centerPoint(forRow: position.row, col: position.col)
+
+        let targetScale: CGFloat = 2.5
+        let mapWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
+        let mapHeight: CGFloat = 10 * ParkingLotLayout.spotHeight + 4 * ParkingLotLayout.laneHeight
+        let mapCenter = CGPoint(x: mapWidth / 2, y: mapHeight / 2)
+
+        let targetOffset = CGSize(
+            width: -(spotCenter.x - mapCenter.x) * targetScale,
+            height: -(spotCenter.y - mapCenter.y) * targetScale
+        )
+
+        withAnimation(.easeInOut(duration: 0.5)) {
+            currentScale = targetScale
+            currentOffset = targetOffset
+            currentRotation = .zero
+        }
+
+        lastScale = targetScale
+        lastOffset = targetOffset
+        lastRotation = .zero
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isSearching = false
+            searchText = ""
         }
     }
 
@@ -139,6 +206,55 @@ struct ParkingLotDetailView: View {
         }
         .padding(.horizontal)
     }
+
+    // MARK: - Search Overlay
+
+    private var searchOverlay: some View {
+        VStack {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+
+                TextField("Spot number (1-220)", text: $searchText)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.plain)
+
+                if !searchText.isEmpty {
+                    Button {
+                        navigateToSpot()
+                    } label: {
+                        Text("Go")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(isValidSpotNumber ? Color.blue : Color.gray)
+                            .cornerRadius(8)
+                    }
+                    .disabled(!isValidSpotNumber)
+                }
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        isSearching = false
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(12)
+            .background(.ultraThinMaterial)
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            Spacer()
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
 }
 
 // MARK: - Parking Lot View
@@ -194,11 +310,13 @@ struct ParkingRowView: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(0..<ParkingLotMap.spotsPerRow, id: \.self) { col in
+                let spotNum = ParkingLotMap.spotNumber(forRow: rowIndex, col: col) ?? 0
                 ParkingSpotView(
                     spot: parkingLot.map.map[rowIndex][col],
                     row: rowIndex,
                     col: col,
-                    facingUp: facingUp
+                    facingUp: facingUp,
+                    spotNumber: spotNum
                 )
                 .onTapGesture {
                     parkingLot.toggleSpot(row: rowIndex, col: col)
@@ -215,6 +333,7 @@ struct ParkingSpotView: View {
     let row: Int
     let col: Int
     let facingUp: Bool
+    let spotNumber: Int
 
     var indicatorColor: Color {
         if spot.status == .occupied {
@@ -250,6 +369,12 @@ struct ParkingSpotView: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.white)
             }
+
+            // Spot number label
+            Text("\(spotNumber)")
+                .font(.system(size: 7, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.85))
+                .offset(y: facingUp ? -16 : 16)
         }
         .frame(width: ParkingLotLayout.spotWidth, height: ParkingLotLayout.spotHeight)
     }
