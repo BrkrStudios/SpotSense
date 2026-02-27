@@ -1,0 +1,73 @@
+export enum SpotStatus {
+  Occupied = 1,
+  Available = 2,
+  NotASpot = 3,
+  Handicap = 4,
+}
+
+export interface ParkingSpot {
+  status: SpotStatus;
+  isHandicap: boolean;
+}
+
+export interface SensorReading {
+  spotId: number;
+  row: number;
+  col: number;
+  distanceMm: number;
+  objectDetected: boolean;
+  cameraSnapshotUrl: string | null;
+  lastUpdated: string;
+  batteryPercent: number | null;
+  sensorOnline: boolean;
+  consecutiveDetections: number;
+}
+
+export interface ParkingLotData {
+  grid: ParkingSpot[][];
+  sensors: Record<number, SensorReading>;
+  lastSync: string;
+  piZeroStatus: "online" | "offline" | "degraded";
+  piFiveStatus: "online" | "offline" | "degraded";
+}
+
+export interface ParkingStats {
+  totalSpots: number;
+  available: number;
+  occupied: number;
+  handicapTotal: number;
+  handicapAvailable: number;
+  sensorsOnline: number;
+  sensorsOffline: number;
+}
+
+export interface SystemConfiguration {
+  pollingIntervalMs: number;
+  cameraThreshold: number;
+  spotDesignations: SpotDesignation[];
+}
+
+export interface SpotDesignation {
+  spotId: number;
+  designation: "normal" | "handicap" | "out_of_service" | "reserved";
+}
+
+export interface Alert {
+  id: string;
+  timestamp: string;
+  severity: "info" | "warning" | "critical";
+  message: string;
+  spotId?: number;
+  type:
+    | "sensor_offline"
+    | "battery_low"
+    | "connection_lost"
+    | "occupancy_threshold"
+    | "system";
+}
+
+export interface OccupancyDataPoint {
+  timestamp: string;
+  occupiedCount: number;
+  availableCount: number;
+}

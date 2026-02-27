@@ -100,7 +100,7 @@ struct ParkingLotDetailView: View {
 
         let targetScale: CGFloat = 2.5
         let mapWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
-        let mapHeight: CGFloat = 10 * ParkingLotLayout.spotHeight + 4 * ParkingLotLayout.laneHeight
+        let mapHeight = 10 * ParkingLotLayout.spotHeight + 4 * ParkingLotLayout.laneHeight
         let mapCenter = CGPoint(x: mapWidth / 2, y: mapHeight / 2)
 
         let targetOffset = CGSize(
@@ -257,7 +257,7 @@ struct ParkingLotDetailView: View {
     }
 }
 
-// MARK: - Parking Lot View
+// MARK: - Parking Grid View
 
 struct ParkingLotView: View {
     @ObservedObject var parkingLot: ParkingLotViewModel

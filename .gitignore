@@ -1,0 +1,45 @@
+# === macOS ===
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# === Xcode ===
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# === Next.js / Node (admin-portal) ===
+node_modules/
+.next/
+out/
+.vercel/
+next-env.d.ts
+
+# === Environment / Secrets ===
+.env
+.env.local
+.env.*.local
+
+# === IDE / Editor ===
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Misc ===
+*.log
+npm-debug.log*
+.turbo/
