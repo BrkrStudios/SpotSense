@@ -5,19 +5,13 @@ import StatCard from "@/components/dashboard/StatCard";
 import OccupancyChart from "@/components/dashboard/OccupancyChart";
 import AlertsFeed from "@/components/dashboard/AlertsFeed";
 import SystemHealthSummary from "@/components/dashboard/SystemHealthSummary";
-import {
-  getMockParkingData,
-  getMockStats,
-  getMockAlerts,
-  getMockOccupancyHistory,
-} from "@/lib/mock-data";
+import { useServerTime } from "@/hooks/useServerTime";
+import { useLiveParkingData } from "@/hooks/useLiveParkingData";
 import { COLORS } from "@/lib/constants";
 
 export default function DashboardPage() {
-  const data = getMockParkingData();
-  const stats = getMockStats();
-  const alerts = getMockAlerts();
-  const history = getMockOccupancyHistory();
+  const serverTime = useServerTime();
+  const { data, stats, occupancyHistory, alerts } = useLiveParkingData(serverTime);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -75,7 +69,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Chart */}
-        <OccupancyChart data={history} />
+        <OccupancyChart data={occupancyHistory} serverTime={serverTime} />
 
         {/* Bottom row */}
         <div className="grid grid-cols-2 gap-4">

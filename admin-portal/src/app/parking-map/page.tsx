@@ -5,14 +5,14 @@ import Header from "@/components/layout/Header";
 import ParkingLotGrid from "@/components/parking-map/ParkingLotGrid";
 import SpotDetailPanel from "@/components/parking-map/SpotDetailPanel";
 import MapControls from "@/components/parking-map/MapControls";
-import { getMockParkingData, getMockStats } from "@/lib/mock-data";
+import { useServerTime } from "@/hooks/useServerTime";
+import { useLiveParkingData } from "@/hooks/useLiveParkingData";
 import { positionForSpotNumber } from "@/lib/utils";
 import { SPOT_WIDTH, SPOT_HEIGHT, LANE_HEIGHT, SPOTS_PER_ROW, COLORS } from "@/lib/constants";
-import { SpotStatus } from "@/lib/types";
 
 export default function ParkingMapPage() {
-  const data = getMockParkingData();
-  const stats = getMockStats();
+  const serverTime = useServerTime();
+  const { data, stats } = useLiveParkingData(serverTime);
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
