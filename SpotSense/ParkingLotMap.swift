@@ -5,7 +5,7 @@ import SwiftUI
 enum SpotStatus: Int, Codable {
     case occupied = 1      // Car parked
     case available = 2     // No car
-    case notASpot = 3      // Driving lane, grass, etc.
+    case notASpot = 3      // Driving lane, light pole, unusable
     case handicap = 4      // Handicap spot (can be occupied or available)
 }
 
@@ -26,45 +26,84 @@ struct ParkingSpot: Codable {
 // MARK: - Parking Lot Map
 class ParkingLotMap {
     /*
-     Layout based on aerial image:
+     Layout (23 rows):
 
      Row Index | Description
      -------------------------------------------------------
-     0         | Row 1 - Top side (facing up)
-     1         | Row 1 - Bottom side (facing down)
-     2         | Driving Lane (notASpot)
-     3         | Row 2 - Top side
-     4         | Row 2 - Bottom side
-     5         | Driving Lane (notASpot)
-     6         | Row 3 - Top side
-     7         | Row 3 - Bottom side
-     8         | Driving Lane (notASpot)
-     9         | Row 4 - Top side
-     10        | Row 4 - Bottom side
-     11        | Driving Lane (notASpot)
-     12        | Row 5 - Top side
-     13        | Row 5 - Bottom side
+     0         | Grass Lane (top edge)
+     1         | Handicap row (first/last 3 cols = grass, spots 1,3,5,6 HC, 2,4 unusable)
+     2         | Road Lane
+     3         | Handicap row (first/last 3 cols = grass, spots 1,3,5,6 HC, 2,4 unusable)
+     4         | Driving Lane (separator)
+     5         | Single top row (no handicap)
+     6         | Driving Lane
+     7         | Pair top
+     8         | Pair bottom (col 9 = light pole)
+     9         | Driving Lane
+     10        | Pair top (col 0 unusable, col 1 handicap)
+     11        | Pair bottom (col 0 unusable, col 1 handicap)
+     12        | Driving Lane
+     13        | Pair top (normal)
+     14        | Pair bottom (normal)
+     15        | Driving Lane
+     16        | Pair top (col 0 unusable, col 1 handicap)
+     17        | Pair bottom (col 0 unusable, col 1 handicap)
+     18        | Driving Lane
+     19        | Pair top (col 0 unusable, col 1 handicap, col 8 = light pole)
+     20        | Pair bottom (col 0 unusable, col 1 handicap)
+     21        | Driving Lane
+     22        | Single bottom row (col 1 unusable, col 0 & col 2 handicap)
 
      Each row has 22 spots (columns 0-21)
-     Handicap spots are on the left side (columns 0-1 typically)
     */
 
     static let spotsPerRow = 22
-    static let totalRows = 14  // 5 parking rows × 2 depths + 4 driving lanes
+    static let totalRows = 23
 
     // The 2D array backend
     var map: [[ParkingSpot]]
 
     // Parking row indices (actual spots, not driving lanes)
-    let parkingRowIndices = [0, 1, 3, 4, 6, 7, 9, 10, 12, 13]
-    let drivingLaneIndices = [2, 5, 8, 11]
+    let parkingRowIndices = [1, 3, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22]
+    let drivingLaneIndices = [0, 2, 4, 6, 9, 12, 15, 18, 21]
 
     // Handicap spot positions (row, column)
     let handicapPositions: [(row: Int, col: Int)] = [
-        (0, 0), (0, 1),   // Row 1 top - leftmost spots
-        (1, 0), (1, 1),   // Row 1 bottom - leftmost spots
-        (3, 0), (3, 1),   // Row 2 top
-        (4, 0), (4, 1),   // Row 2 bottom
+        // New handicap rows (rows 1, 3)
+        (1, 3), (1, 5), (1, 7), (1, 8),
+        (3, 3), (3, 5), (3, 7), (3, 8),
+        // Existing lot
+        (10, 1),
+        (11, 1),
+        (16, 1),
+        (17, 1),
+        (19, 1),
+        (20, 1),
+        (22, 0),
+        (22, 2),
+    ]
+
+    // Not-a-spot positions within parking rows (light poles, unusable spaces)
+    let notASpotPositions: [(row: Int, col: Int)] = [
+        // New handicap rows — access aisles
+        (1, 4), (1, 6),
+        (3, 4), (3, 6),
+        // Existing lot
+        (8, 9),   // light pole
+        (10, 0),
+        (11, 0),
+        (16, 0),
+        (17, 0),
+        (19, 0),
+        (19, 8),  // light pole
+        (20, 0),
+        (22, 1),
+    ]
+
+    // Grass positions within parking rows (first 3 and last 3 cols on new rows)
+    let grassPositions: [(row: Int, col: Int)] = [
+        (1, 0), (1, 1), (1, 2), (1, 19), (1, 20), (1, 21),
+        (3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21),
     ]
 
     init() {
@@ -78,6 +117,16 @@ class ParkingLotMap {
             for col in 0..<ParkingLotMap.spotsPerRow {
                 map[laneIndex][col] = ParkingSpot(status: .notASpot, isHandicap: false)
             }
+        }
+
+        // Set grass positions as notASpot
+        for pos in grassPositions {
+            map[pos.row][pos.col] = ParkingSpot(status: .notASpot, isHandicap: false)
+        }
+
+        // Set not-a-spot positions within parking rows
+        for pos in notASpotPositions {
+            map[pos.row][pos.col] = ParkingSpot(status: .notASpot, isHandicap: false)
         }
 
         // Set handicap spots
@@ -130,7 +179,7 @@ class ParkingLotMap {
         var count = 0
         for row in parkingRowIndices {
             for col in 0..<ParkingLotMap.spotsPerRow {
-                if map[row][col].isAvailable {
+                if map[row][col].status != .notASpot && map[row][col].isAvailable {
                     count += 1
                 }
             }
@@ -138,7 +187,7 @@ class ParkingLotMap {
         return count
     }
 
-    /// Get total occupied spots 
+    /// Get total occupied spots
     func occupiedSpotCount() -> Int {
         var count = 0
         for row in parkingRowIndices {
@@ -151,9 +200,17 @@ class ParkingLotMap {
         return count
     }
 
-    /// Get total parking spots (excluding driving lanes)
+    /// Get total parking spots (excluding driving lanes and unusable spots)
     func totalSpotCount() -> Int {
-        return parkingRowIndices.count * ParkingLotMap.spotsPerRow
+        var count = 0
+        for row in parkingRowIndices {
+            for col in 0..<ParkingLotMap.spotsPerRow {
+                if map[row][col].status != .notASpot {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 
     /// Get available handicap spots
@@ -163,10 +220,10 @@ class ParkingLotMap {
 
     // MARK: - Spot Numbering
 
-    static let parkingRowOrder = [0, 1, 3, 4, 6, 7, 9, 10, 12, 13]
-    static let totalNumberedSpots = parkingRowOrder.count * spotsPerRow  // 220
+    static let parkingRowOrder = [1, 3, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22]
+    static let totalNumberedSpots = parkingRowOrder.count * spotsPerRow  // 308
 
-    /// Convert a spot number (1-220) to (row, col)
+    /// Convert a spot number (1-308) to (row, col)
     static func position(forSpotNumber spotNumber: Int) -> (row: Int, col: Int)? {
         guard spotNumber >= 1 && spotNumber <= totalNumberedSpots else { return nil }
         let zeroIndexed = spotNumber - 1
@@ -176,7 +233,7 @@ class ParkingLotMap {
         return (row, col)
     }
 
-    /// Convert (row, col) to spot number (1-220), returns nil for driving lanes
+    /// Convert (row, col) to spot number (1-308), returns nil for driving lanes
     static func spotNumber(forRow row: Int, col: Int) -> Int? {
         guard let parkingRowIndex = parkingRowOrder.firstIndex(of: row) else { return nil }
         return parkingRowIndex * spotsPerRow + col + 1
@@ -184,11 +241,22 @@ class ParkingLotMap {
 
     /// Calculate the center point of a spot in ParkingLotView coordinates
     static func centerPoint(forRow row: Int, col: Int) -> CGPoint {
-        let x = CGFloat(col) * ParkingLotLayout.spotWidth + ParkingLotLayout.spotWidth / 2
+        let roadWidth: CGFloat = 56
+        let x = roadWidth + CGFloat(col) * ParkingLotLayout.spotWidth + ParkingLotLayout.spotWidth / 2
 
-        var y: CGFloat = 0
-        let aisles: [(top: Int, bottom: Int, hasLane: Bool)] = [
-            (0, 1, true), (3, 4, true), (6, 7, true), (9, 10, true), (12, 13, false)
+        // Start after the top grass lane
+        var y: CGFloat = ParkingLotLayout.laneHeight
+
+        let aisles: [(top: Int, bottom: Int?, lane: Int?)] = [
+            (1, nil, 2),
+            (3, nil, 4),
+            (5, nil, 6),
+            (7, 8, 9),
+            (10, 11, 12),
+            (13, 14, 15),
+            (16, 17, 18),
+            (19, 20, 21),
+            (22, nil, nil),
         ]
 
         for aisle in aisles {
@@ -198,13 +266,15 @@ class ParkingLotMap {
             }
             y += ParkingLotLayout.spotHeight
 
-            if row == aisle.bottom {
-                y += ParkingLotLayout.spotHeight / 2
-                return CGPoint(x: x, y: y)
+            if let bottom = aisle.bottom {
+                if row == bottom {
+                    y += ParkingLotLayout.spotHeight / 2
+                    return CGPoint(x: x, y: y)
+                }
+                y += ParkingLotLayout.spotHeight
             }
-            y += ParkingLotLayout.spotHeight
 
-            if aisle.hasLane {
+            if aisle.lane != nil {
                 y += ParkingLotLayout.laneHeight
             }
         }
@@ -217,7 +287,7 @@ class ParkingLotMap {
     /// Print the map to console (for debugging)
     func printMap() {
         print("\nParking Lot Map:")
-        print("Legend: O=Occupied, A=Available, -=Lane, H=Handicap(available), X=Handicap(occupied)")
+        print("Legend: O=Occupied, A=Available, -=Lane/Unusable, H=Handicap(available), X=Handicap(occupied)")
         print(String(repeating: "-", count: ParkingLotMap.spotsPerRow + 10))
 
         for (rowIndex, row) in map.enumerated() {
@@ -239,34 +309,16 @@ class ParkingLotMap {
             if drivingLaneIndices.contains(rowIndex) {
                 rowString += "  (Driving Lane)"
             } else {
-                let parkingRow = (rowIndex / 3) + 1
-                let side = rowIndex % 3 == 0 ? "Top" : "Bottom"
-                rowString += "  (Parking Row \(parkingRow) - \(side))"
+                rowString += "  (Parking Row)"
             }
 
             print(rowString)
         }
 
         print(String(repeating: "-", count: ParkingLotMap.spotsPerRow + 10))
-        print("Total Spots: \(totalSpotCount())")
+        print("Total Usable Spots: \(totalSpotCount())")
         print("Available: \(availableSpotCount())")
         print("Occupied: \(occupiedSpotCount())")
         print("Handicap Available: \(availableHandicapSpotCount())")
     }
 }
-
-// MARK: - Example Usage
-/*
-let parkingLot = ParkingLotMap()
-
-// Simulate a few cars parked (based on the image - ~2-3 cars visible)
-parkingLot.parkCar(row: 3, col: 0)   // Blue car in row 2
-parkingLot.parkCar(row: 7, col: 5)   // Silver car in row 3
-
-// Print the map
-parkingLot.printMap()
-
-// Check availability
-print("Is spot (3, 0) available? \(parkingLot.map[3][0].isAvailable)")
-print("Is spot (0, 10) available? \(parkingLot.map[0][10].isAvailable)")
-*/

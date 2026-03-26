@@ -14,9 +14,13 @@ import {
   PARKING_ROW_INDICES,
   DRIVING_LANE_INDICES,
   HANDICAP_POSITIONS,
+  NOT_A_SPOT_POSITIONS,
+  GRASS_POSITIONS,
   TOTAL_NUMBERED_SPOTS,
 } from "./constants";
 import { spotNumberForPosition, seededRandom } from "./utils";
+
+const UNUSABLE_COUNT = NOT_A_SPOT_POSITIONS.length + GRASS_POSITIONS.length;
 
 const todaySeed = Math.floor(Date.now() / 86400000);
 const rand = seededRandom(todaySeed);
@@ -28,6 +32,10 @@ function buildGrid(): ParkingSpot[][] {
     const rowData: ParkingSpot[] = [];
     for (let col = 0; col < SPOTS_PER_ROW; col++) {
       if (DRIVING_LANE_INDICES.includes(row)) {
+        rowData.push({ status: SpotStatus.NotASpot, isHandicap: false });
+      } else if (GRASS_POSITIONS.some(([r, c]) => r === row && c === col)) {
+        rowData.push({ status: SpotStatus.NotASpot, isHandicap: false });
+      } else if (NOT_A_SPOT_POSITIONS.some(([r, c]) => r === row && c === col)) {
         rowData.push({ status: SpotStatus.NotASpot, isHandicap: false });
       } else {
         const isHC = HANDICAP_POSITIONS.some(
@@ -43,7 +51,7 @@ function buildGrid(): ParkingSpot[][] {
     grid.push(rowData);
   }
 
-  // Randomly occupy ~45% of spots
+  // Randomly occupy ~45% of usable spots
   for (const row of PARKING_ROW_INDICES) {
     for (let col = 0; col < SPOTS_PER_ROW; col++) {
       if (grid[row][col].status === SpotStatus.NotASpot) continue;
@@ -71,6 +79,7 @@ function buildSensors(
       if (!spotId) continue;
 
       const spot = grid[row][col];
+      if (spot.status === SpotStatus.NotASpot) continue;
       const isOccupied = spot.status === SpotStatus.Occupied;
       const isOnline = rand() > 0.05; // 95% online rate
       const lastUpdatedOffset = Math.floor(rand() * 300000); // 0-5 min ago
@@ -183,13 +192,14 @@ function buildOccupancyHistory(): OccupancyDataPoint[] {
     const peak = 12.5;
     const sigma = 3.5;
     const curve = Math.exp(-Math.pow(hour - peak, 2) / (2 * sigma * sigma));
-    const baseOccupancy = Math.floor(curve * 170 + 20 + (rand() - 0.5) * 20);
-    const occupied = Math.min(220, Math.max(0, baseOccupancy));
+    const usableSpots = TOTAL_NUMBERED_SPOTS - UNUSABLE_COUNT;
+    const baseOccupancy = Math.floor(curve * 195 + 20 + (rand() - 0.5) * 20);
+    const occupied = Math.min(usableSpots, Math.max(0, baseOccupancy));
 
     points.push({
       timestamp: time.toISOString(),
       occupiedCount: occupied,
-      availableCount: 220 - occupied,
+      availableCount: usableSpots - occupied,
     });
   }
 
@@ -227,6 +237,7 @@ export function getMockStats(): ParkingStats {
   for (const row of PARKING_ROW_INDICES) {
     for (let col = 0; col < SPOTS_PER_ROW; col++) {
       const spot = data.grid[row][col];
+      if (spot.status === SpotStatus.NotASpot) continue;
       if (spot.status === SpotStatus.Occupied) {
         occupied++;
       } else {
@@ -242,7 +253,7 @@ export function getMockStats(): ParkingStats {
   }
 
   return {
-    totalSpots: TOTAL_NUMBERED_SPOTS,
+    totalSpots: TOTAL_NUMBERED_SPOTS - UNUSABLE_COUNT,
     available,
     occupied,
     handicapTotal: HANDICAP_POSITIONS.length,

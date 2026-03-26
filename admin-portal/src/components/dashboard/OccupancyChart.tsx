@@ -25,7 +25,7 @@ export default function OccupancyChart({ data, serverTime }: OccupancyChartProps
 
   useEffect(() => setMounted(true), []);
 
-  const maxVal = 220;
+  const maxVal = 283;
   const width = 800;
   const height = 200;
   const padding = { top: 10, right: 10, bottom: 30, left: 40 };
@@ -145,7 +145,7 @@ export default function OccupancyChart({ data, serverTime }: OccupancyChartProps
     padding.top + chartH
   } L ${points[0].x} ${padding.top + chartH} Z`;
 
-  const yLabels = [0, 55, 110, 165, 220];
+  const yLabels = [0, 70, 140, 210, 283];
 
   const xLabels: { label: string; hour: number }[] = [];
   for (let h = 0; h <= 24; h += 4) {

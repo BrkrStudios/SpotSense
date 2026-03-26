@@ -6,8 +6,9 @@ import DrivingLane from "./DrivingLane";
 
 interface ParkingAisleProps {
   topRowIndex: number;
-  bottomRowIndex: number;
+  bottomRowIndex: number | null;
   hasLane: boolean;
+  laneType?: "lane" | "road" | "grass";
   grid: ParkingSpotType[][];
   selectedSpotId: number | null;
   onSpotClick: (spotId: number) => void;
@@ -17,6 +18,7 @@ export default function ParkingAisle({
   topRowIndex,
   bottomRowIndex,
   hasLane,
+  laneType = "lane",
   grid,
   selectedSpotId,
   onSpotClick,
@@ -30,14 +32,16 @@ export default function ParkingAisle({
         selectedSpotId={selectedSpotId}
         onSpotClick={onSpotClick}
       />
-      <ParkingRow
-        spots={grid[bottomRowIndex]}
-        rowIndex={bottomRowIndex}
-        facingUp={false}
-        selectedSpotId={selectedSpotId}
-        onSpotClick={onSpotClick}
-      />
-      {hasLane && <DrivingLane />}
+      {bottomRowIndex !== null && (
+        <ParkingRow
+          spots={grid[bottomRowIndex]}
+          rowIndex={bottomRowIndex}
+          facingUp={false}
+          selectedSpotId={selectedSpotId}
+          onSpotClick={onSpotClick}
+        />
+      )}
+      {hasLane && <DrivingLane laneType={laneType} />}
     </div>
   );
 }

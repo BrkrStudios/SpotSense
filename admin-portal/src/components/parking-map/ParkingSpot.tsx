@@ -1,7 +1,7 @@
 "use client";
 
 import { ParkingSpot as ParkingSpotType, SpotStatus } from "@/lib/types";
-import { SPOT_WIDTH, SPOT_HEIGHT, LINE_WIDTH, COLORS, SPOTS_PER_ROW } from "@/lib/constants";
+import { SPOT_WIDTH, SPOT_HEIGHT, LINE_WIDTH, COLORS, SPOTS_PER_ROW, NOT_A_SPOT_POSITIONS, GRASS_POSITIONS } from "@/lib/constants";
 import { spotColor } from "@/lib/utils";
 
 interface ParkingSpotProps {
@@ -25,6 +25,8 @@ export default function ParkingSpot({
 }: ParkingSpotProps) {
   const isLastColumn = col === SPOTS_PER_ROW - 1;
   const color = spotColor(spot);
+  const isUnusable = NOT_A_SPOT_POSITIONS.some(([r, c]) => r === row && c === col);
+  const isGrass = GRASS_POSITIONS.some(([r, c]) => r === row && c === col);
 
   return (
     <div
@@ -34,75 +36,115 @@ export default function ParkingSpot({
         height: SPOT_HEIGHT,
         backgroundColor: COLORS.asphalt,
       }}
-      onClick={onClick}
+      onClick={isUnusable || isGrass ? undefined : onClick}
     >
-      {/* Left edge line (always) */}
-      <div
-        className="absolute left-0 top-0 bottom-0"
-        style={{ width: LINE_WIDTH, backgroundColor: COLORS.line }}
-      />
-
-      {/* Right edge line (only on last column) */}
-      {isLastColumn && (
+      {/* Grass spots get solid green fill, no lines */}
+      {isGrass ? (
         <div
-          className="absolute right-0 top-0 bottom-0"
-          style={{ width: LINE_WIDTH, backgroundColor: COLORS.line }}
-        />
-      )}
-
-      {/* Back edge line — facingUp: bottom border, facingDown: top border */}
-      {facingUp ? (
-        <div
-          className="absolute left-0 right-0 bottom-0"
-          style={{ height: LINE_WIDTH, backgroundColor: COLORS.line }}
+          className="absolute inset-0"
+          style={{ backgroundColor: COLORS.grass }}
         />
       ) : (
-        <div
-          className="absolute left-0 right-0 top-0"
-          style={{ height: LINE_WIDTH, backgroundColor: COLORS.line }}
-        />
+        <>
+          {/* Left edge line (always) */}
+          <div
+            className="absolute left-0 top-0 bottom-0"
+            style={{ width: LINE_WIDTH, backgroundColor: COLORS.line }}
+          />
+
+          {/* Right edge line (only on last column) */}
+          {isLastColumn && (
+            <div
+              className="absolute right-0 top-0 bottom-0"
+              style={{ width: LINE_WIDTH, backgroundColor: COLORS.line }}
+            />
+          )}
+
+          {/* Back edge line — facingUp: bottom border, facingDown: top border */}
+          {facingUp ? (
+            <div
+              className="absolute left-0 right-0 bottom-0"
+              style={{ height: LINE_WIDTH, backgroundColor: COLORS.line }}
+            />
+          ) : (
+            <div
+              className="absolute left-0 right-0 top-0"
+              style={{ height: LINE_WIDTH, backgroundColor: COLORS.line }}
+            />
+          )}
+        </>
       )}
 
-      {/* Status indicator */}
-      <div
-        className="absolute rounded-[4px]"
-        style={{
-          left: 3,
-          right: 3,
-          top: 4,
-          bottom: 4,
-          backgroundColor: color,
-          boxShadow: isSelected ? "0 0 0 2px #fff" : "none",
-        }}
-      />
+      {isGrass ? null : isUnusable ? (
+        /* Yellow diagonal hatching for unusable spots */
+        <svg
+          className="absolute"
+          style={{ left: 3, right: 3, top: 4, bottom: 4, width: SPOT_WIDTH - 6, height: SPOT_HEIGHT - 8 }}
+          viewBox={`0 0 ${SPOT_WIDTH - 6} ${SPOT_HEIGHT - 8}`}
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <pattern
+              id={`hatch-${row}-${col}`}
+              patternUnits="userSpaceOnUse"
+              width="6"
+              height="6"
+              patternTransform="rotate(45)"
+            >
+              <line x1="0" y1="0" x2="0" y2="6" stroke="#D4A017" strokeWidth="1.5" />
+            </pattern>
+          </defs>
+          <rect
+            width={SPOT_WIDTH - 6}
+            height={SPOT_HEIGHT - 8}
+            rx="4"
+            fill={`url(#hatch-${row}-${col})`}
+          />
+        </svg>
+      ) : (
+        <>
+          {/* Status indicator */}
+          <div
+            className="absolute rounded-[4px]"
+            style={{
+              left: 3,
+              right: 3,
+              top: 4,
+              bottom: 4,
+              backgroundColor: color,
+              boxShadow: isSelected ? "0 0 0 2px #fff" : "none",
+            }}
+          />
 
-      {/* Handicap icon */}
-      {spot.isHandicap && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg
-            viewBox="0 0 24 24"
-            width="10"
-            height="10"
-            fill="white"
-            className="opacity-90"
+          {/* Handicap icon */}
+          {spot.isHandicap && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg
+                viewBox="0 0 24 24"
+                width="10"
+                height="10"
+                fill="white"
+                className="opacity-90"
+              >
+                <path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm-1 8a4 4 0 0 0-4 4v1h2v-1a2 2 0 0 1 2-2h1v5h-3l-1 3h8l-1-3h-1V10h-3z" />
+              </svg>
+            </div>
+          )}
+
+          {/* Spot number */}
+          <div
+            className="absolute left-0 right-0 text-center"
+            style={{
+              fontSize: 7,
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.85)",
+              ...(facingUp ? { top: 2 } : { bottom: 2 }),
+            }}
           >
-            <path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm-1 8a4 4 0 0 0-4 4v1h2v-1a2 2 0 0 1 2-2h1v5h-3l-1 3h8l-1-3h-1V10h-3z" />
-          </svg>
-        </div>
+            {spotNumber}
+          </div>
+        </>
       )}
-
-      {/* Spot number */}
-      <div
-        className="absolute left-0 right-0 text-center"
-        style={{
-          fontSize: 7,
-          fontWeight: 600,
-          color: "rgba(255,255,255,0.85)",
-          ...(facingUp ? { top: 2 } : { bottom: 2 }),
-        }}
-      >
-        {spotNumber}
-      </div>
     </div>
   );
 }

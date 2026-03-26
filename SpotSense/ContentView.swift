@@ -15,12 +15,22 @@ enum ParkingLotLayout {
     static let spotHeight: CGFloat = 48
     static let lineWidth: CGFloat = 1.5
     static let laneHeight: CGFloat = 56
+    static let roadWidth: CGFloat = 56
     static let asphaltColor = Color(red: 0.18, green: 0.18, blue: 0.20)
     static let lineColor = Color(red: 0.85, green: 0.85, blue: 0.80)
     static let laneColor = Color(red: 0.22, green: 0.22, blue: 0.24)
     static let handicapBlue = Color(red: 0.2, green: 0.4, blue: 0.9)
     static let spotAvailable = Color(red: 0.2, green: 0.75, blue: 0.3)
     static let spotOccupied = Color(red: 0.85, green: 0.15, blue: 0.15)
+    static let hatchYellow = Color(red: 0.83, green: 0.63, blue: 0.09)
+    static let grassColor = Color(red: 0.18, green: 0.35, blue: 0.12)
+    static let roadColor = Color(red: 0.22, green: 0.22, blue: 0.24)
+}
+
+// MARK: - Lane Type
+
+enum LaneType {
+    case lane, road, grass
 }
 
 // MARK: - Parking Lot Detail View
@@ -99,8 +109,9 @@ struct ParkingLotDetailView: View {
         let spotCenter = ParkingLotMap.centerPoint(forRow: position.row, col: position.col)
 
         let targetScale: CGFloat = 2.5
-        let mapWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
-        let mapHeight = 10 * ParkingLotLayout.spotHeight + 4 * ParkingLotLayout.laneHeight
+        let parkingWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
+        let mapWidth = ParkingLotLayout.roadWidth + parkingWidth + ParkingLotLayout.roadWidth
+        let mapHeight = ParkingLotLayout.laneHeight + 14 * ParkingLotLayout.spotHeight + 8 * ParkingLotLayout.laneHeight
         let mapCenter = CGPoint(x: mapWidth / 2, y: mapHeight / 2)
 
         let targetOffset = CGSize(
@@ -140,7 +151,6 @@ struct ParkingLotDetailView: View {
                             isPinching = true
                             let newScale = min(max(lastScale * value, 0.5), 4.0)
                             let delta = newScale / currentScale
-                            // Use pinch location if available, otherwise zoom from center
                             let anchor = pinchCenter ?? viewCenter
                             let anchorOffset = CGSize(
                                 width: anchor.x - viewCenter.x,
@@ -199,6 +209,18 @@ struct ParkingLotDetailView: View {
                 StatCircle(value: parkingLot.availableCount, color: ParkingLotLayout.spotAvailable, icon: "car.fill")
                 StatCircle(value: parkingLot.occupiedCount, color: ParkingLotLayout.spotOccupied, icon: "car.fill")
                 StatCircle(value: parkingLot.handicapAvailableCount, color: ParkingLotLayout.handicapBlue, icon: "figure.roll")
+
+                Spacer()
+
+                // Connection status indicator
+                VStack(spacing: 2) {
+                    Circle()
+                        .fill(parkingLot.isConnected ? Color.green : Color.red)
+                        .frame(width: 10, height: 10)
+                    Text(parkingLot.isConnected ? "Live" : "Offline")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
             }
             .padding(.top, 8)
 
@@ -215,7 +237,7 @@ struct ParkingLotDetailView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
 
-                TextField("Spot number (1-220)", text: $searchText)
+                TextField("Spot number (1-308)", text: $searchText)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.plain)
 
@@ -262,41 +284,91 @@ struct ParkingLotDetailView: View {
 struct ParkingLotView: View {
     @ObservedObject var parkingLot: ParkingLotViewModel
 
-    // 5 aisles: (topRow, bottomRow, laneRow?)
-    let aisles: [(top: Int, bottom: Int, lane: Int?)] = [
-        (0, 1, 2),
-        (3, 4, 5),
-        (6, 7, 8),
-        (9, 10, 11),
-        (12, 13, nil)
+    // Lane types for each driving lane row index
+    static let laneTypes: [Int: LaneType] = [
+        0: .grass,
+        2: .road,
+        4: .lane,
+        6: .lane,
+        9: .lane,
+        12: .lane,
+        15: .lane,
+        18: .lane,
+        21: .lane,
     ]
 
+    // Grass positions for spot-level rendering
+    static let grassPositions: Set<String> = {
+        let positions: [(Int, Int)] = [
+            (1, 0), (1, 1), (1, 2), (1, 19), (1, 20), (1, 21),
+            (3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21),
+        ]
+        return Set(positions.map { "\($0.0)-\($0.1)" })
+    }()
+
+    static func isGrassPosition(row: Int, col: Int) -> Bool {
+        grassPositions.contains("\(row)-\(col)")
+    }
+
+    let aisles: [(top: Int, bottom: Int?, lane: Int?)] = [
+        (1, nil, 2),
+        (3, nil, 4),
+        (5, nil, 6),
+        (7, 8, 9),
+        (10, 11, 12),
+        (13, 14, 15),
+        (16, 17, 18),
+        (19, 20, 21),
+        (22, nil, nil),
+    ]
+
+    let parkingWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
+
     var body: some View {
-        VStack(spacing: 0) {
-            ForEach(aisles.indices, id: \.self) { aisleIndex in
-                let aisle = aisles[aisleIndex]
+        HStack(spacing: 0) {
+            // Left road column
+            Rectangle()
+                .fill(ParkingLotLayout.roadColor)
+                .frame(width: ParkingLotLayout.roadWidth)
 
-                // Top row of spots (facing up — open toward top, lines at bottom)
-                ParkingRowView(
-                    parkingLot: parkingLot,
-                    rowIndex: aisle.top,
-                    facingUp: true
-                )
+            // Main parking area
+            VStack(spacing: 0) {
+                // Top grass lane
+                DrivingLaneView(laneType: .grass)
 
-                // Bottom row of spots (facing down — open toward bottom, lines at top)
-                ParkingRowView(
-                    parkingLot: parkingLot,
-                    rowIndex: aisle.bottom,
-                    facingUp: false
-                )
+                ForEach(aisles.indices, id: \.self) { aisleIndex in
+                    let aisle = aisles[aisleIndex]
 
-                // Driving lane (if present)
-                if aisle.lane != nil {
-                    DrivingLaneView()
+                    // Top row
+                    ParkingRowView(
+                        parkingLot: parkingLot,
+                        rowIndex: aisle.top,
+                        facingUp: true
+                    )
+
+                    // Bottom row
+                    if let bottom = aisle.bottom {
+                        ParkingRowView(
+                            parkingLot: parkingLot,
+                            rowIndex: bottom,
+                            facingUp: false
+                        )
+                    }
+
+                    // Driving lane
+                    if let lane = aisle.lane {
+                        let laneType = ParkingLotView.laneTypes[lane] ?? .lane
+                        DrivingLaneView(laneType: laneType)
+                    }
                 }
             }
+            .background(ParkingLotLayout.asphaltColor)
+
+            // Right road column
+            Rectangle()
+                .fill(ParkingLotLayout.roadColor)
+                .frame(width: ParkingLotLayout.roadWidth)
         }
-        .background(ParkingLotLayout.asphaltColor)
     }
 }
 
@@ -311,15 +383,19 @@ struct ParkingRowView: View {
         HStack(spacing: 0) {
             ForEach(0..<ParkingLotMap.spotsPerRow, id: \.self) { col in
                 let spotNum = ParkingLotMap.spotNumber(forRow: rowIndex, col: col) ?? 0
+                let isGrass = ParkingLotView.isGrassPosition(row: rowIndex, col: col)
                 ParkingSpotView(
                     spot: parkingLot.map.map[rowIndex][col],
                     row: rowIndex,
                     col: col,
                     facingUp: facingUp,
-                    spotNumber: spotNum
+                    spotNumber: spotNum,
+                    isGrass: isGrass
                 )
                 .onTapGesture {
-                    parkingLot.toggleSpot(row: rowIndex, col: col)
+                    if !isGrass {
+                        parkingLot.toggleSpot(row: rowIndex, col: col)
+                    }
                 }
             }
         }
@@ -334,6 +410,11 @@ struct ParkingSpotView: View {
     let col: Int
     let facingUp: Bool
     let spotNumber: Int
+    let isGrass: Bool
+
+    var isUnusable: Bool {
+        spot.status == .notASpot && !isGrass
+    }
 
     var indicatorColor: Color {
         if spot.status == .occupied {
@@ -347,36 +428,71 @@ struct ParkingSpotView: View {
 
     var body: some View {
         ZStack {
-            // Base asphalt
-            Rectangle()
-                .fill(ParkingLotLayout.asphaltColor)
+            if isGrass {
+                // Solid green fill for grass positions
+                Rectangle()
+                    .fill(ParkingLotLayout.grassColor)
+            } else {
+                // Base asphalt
+                Rectangle()
+                    .fill(ParkingLotLayout.asphaltColor)
 
-            // Parking line markings
-            ParkingLineOverlay(
-                facingUp: facingUp,
-                isLastColumn: col == ParkingLotMap.spotsPerRow - 1
-            )
+                // Parking line markings
+                ParkingLineOverlay(
+                    facingUp: facingUp,
+                    isLastColumn: col == ParkingLotMap.spotsPerRow - 1
+                )
 
-            // Spot status indicator
-            RoundedRectangle(cornerRadius: 4)
-                .fill(indicatorColor)
-                .padding(.horizontal, 3)
-                .padding(.vertical, 4)
+                if isUnusable {
+                    // Yellow diagonal hatching for unusable spots
+                    DiagonalHatchPattern()
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 4)
+                } else if spot.status != .notASpot {
+                    // Spot status indicator
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(indicatorColor)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 4)
 
-            // Handicap icon overlay
-            if spot.isHandicap {
-                Image(systemName: "figure.roll")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
+                    // Handicap icon overlay
+                    if spot.isHandicap {
+                        Image(systemName: "figure.roll")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+
+                    // Spot number label
+                    Text("\(spotNumber)")
+                        .font(.system(size: 7, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.85))
+                        .offset(y: facingUp ? -16 : 16)
+                }
             }
-
-            // Spot number label
-            Text("\(spotNumber)")
-                .font(.system(size: 7, weight: .semibold, design: .rounded))
-                .foregroundColor(.white.opacity(0.85))
-                .offset(y: facingUp ? -16 : 16)
         }
         .frame(width: ParkingLotLayout.spotWidth, height: ParkingLotLayout.spotHeight)
+    }
+}
+
+// MARK: - Diagonal Hatch Pattern (Yellow lines for unusable spots)
+
+struct DiagonalHatchPattern: View {
+    var body: some View {
+        GeometryReader { geo in
+            let spacing: CGFloat = 5
+            let count = Int((geo.size.width + geo.size.height) / spacing) + 1
+
+            Canvas { context, size in
+                for i in 0..<count {
+                    let offset = CGFloat(i) * spacing - size.height
+                    var path = Path()
+                    path.move(to: CGPoint(x: offset, y: size.height))
+                    path.addLine(to: CGPoint(x: offset + size.height, y: 0))
+                    context.stroke(path, with: .color(ParkingLotLayout.hatchYellow), lineWidth: 1.5)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
     }
 }
 
@@ -406,8 +522,7 @@ struct ParkingLineOverlay: View {
                 }
             }
 
-            // Back edge line (shared median between paired rows)
-            // Only draw on facingUp rows to avoid double-thickness
+            // Back edge line
             if facingUp {
                 VStack {
                     Spacer(minLength: 0)
@@ -431,15 +546,29 @@ struct ParkingLineOverlay: View {
 // MARK: - Driving Lane View
 
 struct DrivingLaneView: View {
+    var laneType: LaneType = .lane
+
+    private var bgColor: Color {
+        switch laneType {
+        case .grass: return ParkingLotLayout.grassColor
+        case .road: return ParkingLotLayout.roadColor
+        case .lane: return ParkingLotLayout.laneColor
+        }
+    }
+
     var body: some View {
         Rectangle()
-            .fill(ParkingLotLayout.laneColor)
+            .fill(bgColor)
             .frame(
                 width: CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth,
                 height: ParkingLotLayout.laneHeight
             )
             .overlay(
-                DashedCenterLine()
+                Group {
+                    if laneType != .grass {
+                        DashedCenterLine()
+                    }
+                }
             )
     }
 }
@@ -493,9 +622,18 @@ struct StatCircle: View {
 
 class ParkingLotViewModel: ObservableObject {
     @Published var map: ParkingLotMap
+    @Published var isConnected: Bool = false
+
+    private let apiService = ParkingAPIService()
+    private var pollTimer: Timer?
 
     init() {
         self.map = ParkingLotMap()
+        startPolling()
+    }
+
+    deinit {
+        pollTimer?.invalidate()
     }
 
     var availableCount: Int {
@@ -526,6 +664,45 @@ class ParkingLotViewModel: ObservableObject {
 
     func reset() {
         map = ParkingLotMap()
+        startPolling()
+    }
+
+    // MARK: - API Polling
+
+    private func startPolling() {
+        pollTimer?.invalidate()
+        fetchData()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.fetchData()
+        }
+    }
+
+    private func fetchData() {
+        Task { @MainActor in
+            do {
+                let response = try await apiService.fetchParkingData()
+                applyAPIResponse(response)
+                isConnected = true
+            } catch {
+                isConnected = false
+            }
+        }
+    }
+
+    private func applyAPIResponse(_ response: ParkingAPIResponse) {
+        for (rowIndex, row) in response.grid.enumerated() {
+            for (colIndex, apiSpot) in row.enumerated() {
+                guard map.isValidPosition(row: rowIndex, col: colIndex) else { continue }
+                guard let spotStatus = SpotStatus(rawValue: apiSpot.status) else { continue }
+                guard spotStatus != .notASpot else { continue }
+
+                map.map[rowIndex][colIndex] = ParkingSpot(
+                    status: spotStatus,
+                    isHandicap: apiSpot.isHandicap
+                )
+            }
+        }
+        objectWillChange.send()
     }
 }
 

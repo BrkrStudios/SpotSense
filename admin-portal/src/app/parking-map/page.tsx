@@ -8,7 +8,7 @@ import MapControls from "@/components/parking-map/MapControls";
 import { useServerTime } from "@/hooks/useServerTime";
 import { useLiveParkingData } from "@/hooks/useLiveParkingData";
 import { positionForSpotNumber } from "@/lib/utils";
-import { SPOT_WIDTH, SPOT_HEIGHT, LANE_HEIGHT, SPOTS_PER_ROW, COLORS } from "@/lib/constants";
+import { SPOT_WIDTH, SPOT_HEIGHT, LANE_HEIGHT, SPOTS_PER_ROW, COLORS, AISLES, ROAD_WIDTH } from "@/lib/constants";
 
 export default function ParkingMapPage() {
   const serverTime = useServerTime();
@@ -20,8 +20,14 @@ export default function ParkingMapPage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const mapWidth = SPOTS_PER_ROW * SPOT_WIDTH;
-  const mapHeight = 10 * SPOT_HEIGHT + 4 * LANE_HEIGHT;
+  const mapWidth = ROAD_WIDTH + SPOTS_PER_ROW * SPOT_WIDTH + ROAD_WIDTH;
+  // Calculate map height from aisle structure + top grass lane
+  const mapHeight = LANE_HEIGHT + AISLES.reduce((h, aisle) => {
+    h += SPOT_HEIGHT; // top row
+    if (aisle.bottom !== null) h += SPOT_HEIGHT; // bottom row
+    if (aisle.lane !== null) h += LANE_HEIGHT; // driving lane
+    return h;
+  }, 0);
 
   const handleZoomIn = () => setScale((s) => Math.min(s * 1.3, 5));
   const handleZoomOut = () => setScale((s) => Math.max(s / 1.3, 0.5));
@@ -35,29 +41,27 @@ export default function ParkingMapPage() {
     const pos = positionForSpotNumber(spotId);
     if (!pos || !containerRef.current) return;
 
-    // Calculate spot center in map coordinates
-    const spotCenterX = pos.col * SPOT_WIDTH + SPOT_WIDTH / 2;
-    // Calculate Y position through aisles
-    let spotCenterY = 0;
-    const aisles = [
-      { top: 0, bottom: 1, hasLane: true },
-      { top: 3, bottom: 4, hasLane: true },
-      { top: 6, bottom: 7, hasLane: true },
-      { top: 9, bottom: 10, hasLane: true },
-      { top: 12, bottom: 13, hasLane: false },
-    ];
-    for (const aisle of aisles) {
+    // Calculate spot center in map coordinates (offset by left road column)
+    const spotCenterX = ROAD_WIDTH + pos.col * SPOT_WIDTH + SPOT_WIDTH / 2;
+    // Calculate Y position through aisles (offset by top grass lane)
+    let spotCenterY = LANE_HEIGHT;
+    let found = false;
+    for (const aisle of AISLES) {
       if (pos.row === aisle.top) {
         spotCenterY += SPOT_HEIGHT / 2;
+        found = true;
         break;
       }
       spotCenterY += SPOT_HEIGHT;
-      if (pos.row === aisle.bottom) {
-        spotCenterY += SPOT_HEIGHT / 2;
-        break;
+      if (aisle.bottom !== null) {
+        if (pos.row === aisle.bottom) {
+          spotCenterY += SPOT_HEIGHT / 2;
+          found = true;
+          break;
+        }
+        spotCenterY += SPOT_HEIGHT;
       }
-      spotCenterY += SPOT_HEIGHT;
-      if (aisle.hasLane) spotCenterY += LANE_HEIGHT;
+      if (aisle.lane !== null) spotCenterY += LANE_HEIGHT;
     }
 
     const containerRect = containerRef.current.getBoundingClientRect();
