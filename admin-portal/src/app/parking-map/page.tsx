@@ -5,15 +5,14 @@ import Header from "@/components/layout/Header";
 import ParkingLotGrid from "@/components/parking-map/ParkingLotGrid";
 import SpotDetailPanel from "@/components/parking-map/SpotDetailPanel";
 import MapControls from "@/components/parking-map/MapControls";
-import { useServerTime } from "@/hooks/useServerTime";
-import { useLiveParkingData } from "@/hooks/useLiveParkingData";
+import { useParkingData } from "@/context/ParkingDataContext";
 import { positionForSpotNumber } from "@/lib/utils";
 import { SPOT_WIDTH, SPOT_HEIGHT, LANE_HEIGHT, SPOTS_PER_ROW, COLORS, AISLES, ROAD_WIDTH } from "@/lib/constants";
 
 export default function ParkingMapPage() {
-  const serverTime = useServerTime();
-  const { data, stats } = useLiveParkingData(serverTime);
+  const { data, stats, heatmapData } = useParkingData();
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
+  const [heatmapOn, setHeatmapOn] = useState(false);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -139,14 +138,44 @@ export default function ParkingMapPage() {
             onSearchSpot={handleSearchSpot}
           />
 
-          {/* Legend */}
+          {/* Legend + Heatmap toggle */}
           <div
-            className="absolute bottom-4 left-4 flex gap-4 px-4 py-2 rounded-lg z-10"
+            className="absolute bottom-4 left-4 flex items-center gap-3 px-4 py-2 rounded-lg z-10"
             style={{ backgroundColor: "var(--sidebar)" }}
           >
-            <LegendItem color={COLORS.available} label="Available" />
-            <LegendItem color={COLORS.occupied} label="Occupied" />
-            <LegendItem color={COLORS.handicap} label="Handicap" />
+            {heatmapOn ? (
+              <>
+                <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>Low</span>
+                <div
+                  className="h-3 w-24 rounded-full"
+                  style={{
+                    background: "linear-gradient(to right, #3B82F6, #22C55E, #EAB308, #DC2626)",
+                  }}
+                />
+                <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>High</span>
+                <LegendItem color="#E67E22" label="Offline" />
+              </>
+            ) : (
+              <>
+                <LegendItem color={COLORS.available} label="Available" />
+                <LegendItem color={COLORS.occupied} label="Occupied" />
+                <LegendItem color={COLORS.handicap} label="Handicap" />
+                <LegendItem color="#E67E22" label="Offline" />
+              </>
+            )}
+            <button
+              onClick={() => setHeatmapOn((v) => !v)}
+              className="ml-2 flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors"
+              style={{
+                backgroundColor: heatmapOn ? "#DC2626" : "var(--surface)",
+                color: heatmapOn ? "#fff" : "var(--text-secondary)",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 23c-4.97 0-8-3.03-8-7 0-3.53 3.793-8.538 6.088-11.334a2.5 2.5 0 013.824 0C16.207 7.462 20 12.47 20 16c0 3.97-3.03 7-8 7zm0-18.5C9.5 7.5 6 12.5 6 16c0 3.31 2.69 5 6 5s6-1.69 6-5c0-3.5-3.5-8.5-6-12.5z" />
+              </svg>
+              Heatmap
+            </button>
           </div>
 
           {/* Zoomable/pannable container */}
@@ -171,6 +200,9 @@ export default function ParkingMapPage() {
             >
               <ParkingLotGrid
                 grid={data.grid}
+                sensors={data.sensors}
+                heatmapOn={heatmapOn}
+                heatmapData={heatmapData}
                 selectedSpotId={selectedSpotId}
                 onSpotClick={setSelectedSpotId}
               />

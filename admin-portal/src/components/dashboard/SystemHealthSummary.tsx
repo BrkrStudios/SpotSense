@@ -31,14 +31,14 @@ export default function SystemHealthSummary({
       </div>
       <div className="p-5 space-y-4">
         <DeviceRow
-          name="Pi 5 — Main Server"
-          status={data.piFiveStatus}
-          detail="Manages scheduling, serves portal"
-        />
-        <DeviceRow
           name="Pi 0 — Edge Unit"
           status={data.piZeroStatus}
           detail="Runs TOF polling, triggers camera"
+        />
+        <DeviceRow
+          name="Railway — Backend API"
+          status={data.backendStatus}
+          detail="FastAPI server, reads from Firebase"
         />
         <div
           className="pt-4 border-t"

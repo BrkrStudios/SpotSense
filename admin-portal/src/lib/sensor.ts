@@ -35,7 +35,7 @@ interface RawSensorEntry {
 
 /** The spot number in our grid that maps to the real sensor */
 export const REAL_SPOT_ID = 308;
-export const REAL_SPOT_ROW = 22;
+export const REAL_SPOT_ROW = 21;
 export const REAL_SPOT_COL = 21;
 
 /**

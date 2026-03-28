@@ -117,9 +117,9 @@ export default function SensorDetailPage({
                   <div className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: sensor.sensorOnline ? "#33BF4D" : "#D92626" }}
+                      style={{ backgroundColor: sensor.sensorOnline ? "#33BF4D" : "#E67E22" }}
                     />
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                    <span className="text-sm font-medium" style={{ color: sensor.sensorOnline ? "var(--text-primary)" : "#E67E22" }}>
                       {sensor.sensorOnline ? "Online" : "Offline"}
                     </span>
                   </div>

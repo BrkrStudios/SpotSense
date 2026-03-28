@@ -7,7 +7,10 @@ import {
   Alert,
   OccupancyDataPoint,
   SystemConfiguration,
+  DailyOccupancyProfile,
+  WeeklyStats,
 } from "./types";
+import { DAY_PROFILES, interpolateProfile } from "./occupancy-profiles";
 import {
   SPOTS_PER_ROW,
   TOTAL_ROWS,
@@ -21,6 +24,36 @@ import {
 import { spotNumberForPosition, seededRandom } from "./utils";
 
 const UNUSABLE_COUNT = NOT_A_SPOT_POSITIONS.length + GRASS_POSITIONS.length;
+
+/** Returns a realistic occupancy fraction based on current day/time.
+ *  Simplified version of the full day profiles used in the context. */
+function getRealisticFillRate(): number {
+  const now = new Date();
+  const day = now.getDay();
+  const hour = now.getHours() + now.getMinutes() / 60;
+
+  // Peak occupancy fraction by day: Mon/Wed ~93-96%, Tue/Thu ~83%, Fri ~84%, Sat ~22%, Sun ~12%
+  const peakByDay = [0.12, 0.93, 0.83, 0.96, 0.83, 0.84, 0.22];
+  const peak = peakByDay[day];
+
+  // Time-of-day curve (fraction of peak): ramps 7-10, peaks 10-13, drops 13-18
+  let timeFactor: number;
+  if (hour < 6) timeFactor = 0.03;
+  else if (hour < 7) timeFactor = 0.05;
+  else if (hour < 8) timeFactor = 0.25;
+  else if (hour < 9) timeFactor = 0.55;
+  else if (hour < 10) timeFactor = 0.80;
+  else if (hour < 13) timeFactor = 1.0;
+  else if (hour < 14) timeFactor = 0.90;
+  else if (hour < 15) timeFactor = 0.75;
+  else if (hour < 16) timeFactor = 0.55;
+  else if (hour < 17) timeFactor = 0.35;
+  else if (hour < 18) timeFactor = 0.20;
+  else if (hour < 20) timeFactor = 0.10;
+  else timeFactor = 0.05;
+
+  return peak * timeFactor;
+}
 
 const todaySeed = Math.floor(Date.now() / 86400000);
 const rand = seededRandom(todaySeed);
@@ -51,11 +84,12 @@ function buildGrid(): ParkingSpot[][] {
     grid.push(rowData);
   }
 
-  // Randomly occupy ~45% of usable spots
+  // Occupy spots based on realistic day-of-week / time-of-day profile
+  const fillRate = getRealisticFillRate();
   for (const row of PARKING_ROW_INDICES) {
     for (let col = 0; col < SPOTS_PER_ROW; col++) {
       if (grid[row][col].status === SpotStatus.NotASpot) continue;
-      if (rand() < 0.45) {
+      if (rand() < fillRate) {
         grid[row][col] = {
           status: SpotStatus.Occupied,
           isHandicap: grid[row][col].isHandicap,
@@ -73,6 +107,23 @@ function buildSensors(
   const sensors: Record<number, SensorReading> = {};
   const now = Date.now();
 
+  // Pick 1-4 random spots to be offline (realistic — most sensors work fine)
+  const allUsableSpots: number[] = [];
+  for (const row of PARKING_ROW_INDICES) {
+    for (let col = 0; col < SPOTS_PER_ROW; col++) {
+      const spot = grid[row][col];
+      if (spot.status === SpotStatus.NotASpot) continue;
+      const spotId = spotNumberForPosition(row, col);
+      if (spotId) allUsableSpots.push(spotId);
+    }
+  }
+  const numOffline = 1 + Math.floor(rand() * 4); // 1-4 offline
+  const offlineSet = new Set<number>();
+  while (offlineSet.size < numOffline) {
+    const idx = Math.floor(rand() * allUsableSpots.length);
+    offlineSet.add(allUsableSpots[idx]);
+  }
+
   for (const row of PARKING_ROW_INDICES) {
     for (let col = 0; col < SPOTS_PER_ROW; col++) {
       const spotId = spotNumberForPosition(row, col);
@@ -80,9 +131,11 @@ function buildSensors(
 
       const spot = grid[row][col];
       if (spot.status === SpotStatus.NotASpot) continue;
+      const isOffline = offlineSet.has(spotId);
       const isOccupied = spot.status === SpotStatus.Occupied;
-      const isOnline = rand() > 0.05; // 95% online rate
-      const lastUpdatedOffset = Math.floor(rand() * 300000); // 0-5 min ago
+      const lastUpdatedOffset = isOffline
+        ? Math.floor(600000 + rand() * 3600000) // offline: 10min-1hr stale
+        : Math.floor(rand() * 300000); // online: 0-5 min ago
 
       sensors[spotId] = {
         spotId,
@@ -95,7 +148,7 @@ function buildSensors(
         cameraSnapshotUrl: null,
         lastUpdated: new Date(now - lastUpdatedOffset).toISOString(),
         batteryPercent: Math.floor(70 + rand() * 30),
-        sensorOnline: isOnline,
+        sensorOnline: !isOffline,
         consecutiveDetections: isOccupied
           ? Math.floor(3 + rand() * 7)
           : 0,
@@ -144,7 +197,7 @@ function buildAlerts(): Alert[] {
       id: "a5",
       timestamp: new Date(now - 1800000).toISOString(),
       severity: "info",
-      message: "Pi 5 restarted successfully",
+      message: "Backend API restarted successfully",
       type: "system",
     },
     {
@@ -220,7 +273,7 @@ export function getMockParkingData(): ParkingLotData {
     sensors,
     lastSync: new Date().toISOString(),
     piZeroStatus: "online",
-    piFiveStatus: "online",
+    backendStatus: "online",
   };
 
   return cachedData;
@@ -269,6 +322,117 @@ export function getMockAlerts(): Alert[] {
 
 export function getMockOccupancyHistory(): OccupancyDataPoint[] {
   return buildOccupancyHistory();
+}
+
+/** Generate historical daily occupancy profiles for the past N days */
+export function generateHistoricalData(numDays: number = 14): DailyOccupancyProfile[] {
+  const today = new Date();
+  const usableSpots = TOTAL_NUMBERED_SPOTS - UNUSABLE_COUNT;
+  const results: DailyOccupancyProfile[] = [];
+
+  for (let d = numDays - 1; d >= 0; d--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - d);
+    const dayOfWeek = date.getDay();
+    const profile = DAY_PROFILES[dayOfWeek];
+    const dateStr = date.toISOString().split("T")[0];
+
+    // Seeded random for consistent data per date
+    let seed = (date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()) % 2147483647;
+    const seededRand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+
+    const points: OccupancyDataPoint[] = [];
+    let peakOccupied = 0;
+    let peakHour = 0;
+    let totalOccupancy = 0;
+    let totalArrivals = 0;
+    let prevOccupied = 0;
+
+    for (let i = 0; i < 96; i++) {
+      const hour = i / 4;
+      const time = new Date(date);
+      time.setHours(Math.floor(hour), (hour % 1) * 60, 0, 0);
+
+      // For today, stop at current time
+      if (d === 0 && time > today) break;
+
+      const fraction = interpolateProfile(profile, hour);
+      const noise = (seededRand() - 0.5) * 0.06 * usableSpots;
+      const occupied = Math.min(usableSpots, Math.max(0, Math.round(fraction * usableSpots + noise)));
+
+      points.push({
+        timestamp: time.toISOString(),
+        occupiedCount: occupied,
+        availableCount: usableSpots - occupied,
+      });
+
+      if (occupied > peakOccupied) {
+        peakOccupied = occupied;
+        peakHour = hour;
+      }
+      totalOccupancy += occupied / usableSpots;
+
+      // Estimate arrivals from deltas
+      if (i > 0 && occupied > prevOccupied) {
+        totalArrivals += occupied - prevOccupied;
+      }
+      prevOccupied = occupied;
+    }
+
+    const numPoints = points.length || 1;
+    results.push({
+      date: dateStr,
+      dayOfWeek,
+      points,
+      peakOccupied,
+      peakHour,
+      avgOccupancy: totalOccupancy / numPoints,
+      turnoverRate: Math.round((totalArrivals / usableSpots) * 10) / 10,
+    });
+  }
+
+  return results;
+}
+
+/** Compute weekly aggregate stats from daily profiles */
+export function computeWeeklyStats(data: DailyOccupancyProfile[]): WeeklyStats {
+  const byDay: number[][] = [[], [], [], [], [], [], []];
+  const peakByDay: number[][] = [[], [], [], [], [], [], []];
+  let totalTurnover = 0;
+  let count = 0;
+
+  for (const day of data) {
+    byDay[day.dayOfWeek].push(day.avgOccupancy);
+    peakByDay[day.dayOfWeek].push(day.peakHour);
+    totalTurnover += day.turnoverRate;
+    count++;
+  }
+
+  const avgOccupancyByDay = byDay.map((arr) =>
+    arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+  );
+  const peakHourByDay = peakByDay.map((arr) =>
+    arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0
+  );
+
+  let busiestDay = 0;
+  let maxOcc = 0;
+  for (let i = 0; i < 7; i++) {
+    if (avgOccupancyByDay[i] > maxOcc) {
+      maxOcc = avgOccupancyByDay[i];
+      busiestDay = i;
+    }
+  }
+
+  return {
+    avgOccupancyByDay,
+    peakHourByDay,
+    busiestDay,
+    avgTurnoverRate: count > 0 ? Math.round((totalTurnover / count) * 10) / 10 : 0,
+  };
 }
 
 export function getMockConfig(): SystemConfiguration {

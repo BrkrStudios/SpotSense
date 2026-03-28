@@ -30,7 +30,7 @@ export default function ConfigurationPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate save to Pi 5
+    // Simulate save to Pi 0 via Railway API
     await new Promise((r) => setTimeout(r, 800));
     setIsSaving(false);
     setShowSuccess(true);
@@ -41,8 +41,8 @@ export default function ConfigurationPage() {
     <div className="min-h-screen flex flex-col">
       <Header title="Configuration" subtitle="Manage sensor and system settings" />
 
-      <div className="flex-1 p-8">
-        <div className="grid grid-cols-2 gap-6">
+      <div className="flex-1 p-4 md:p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left column: controls */}
           <div className="space-y-6">
             <PollingIntervalControl value={pollingInterval} onChange={setPollingInterval} />
@@ -65,7 +65,7 @@ export default function ConfigurationPage() {
                   opacity: isSaving ? 0.7 : 1,
                 }}
               >
-                {isSaving ? "Deploying..." : "Save & Deploy to Pi 5"}
+                {isSaving ? "Deploying..." : "Save & Deploy to Pi 0"}
               </button>
 
               {showSuccess && (
@@ -100,7 +100,7 @@ export default function ConfigurationPage() {
                 </li>
                 <li>
                   <strong style={{ color: "var(--text-primary)" }}>Spot Designations:</strong>{" "}
-                  Mark spots as handicap, out of service, or reserved. Changes are sent to Pi 5 which relays to Pi 0.
+                  Mark spots as handicap, out of service, or reserved. Changes are sent to Pi 0 via Railway API.
                 </li>
                 <li>
                   <strong style={{ color: "var(--text-primary)" }}>Demo Mode:</strong>{" "}

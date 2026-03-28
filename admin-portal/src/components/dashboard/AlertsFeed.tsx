@@ -2,6 +2,7 @@
 
 import { Alert } from "@/lib/types";
 import { relativeTime } from "@/lib/utils";
+import Link from "next/link";
 
 interface AlertsFeedProps {
   alerts: Alert[];
@@ -19,13 +20,16 @@ export default function AlertsFeed({ alerts }: AlertsFeedProps) {
       className="rounded-xl border overflow-hidden"
       style={{ backgroundColor: "var(--sidebar)", borderColor: "var(--border)" }}
     >
-      <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+      <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+        <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
           Recent Alerts
         </h3>
+        <Link href="/alerts" className="text-xs hover:underline" style={{ color: "#3B82F6" }}>
+          View All &rarr;
+        </Link>
       </div>
-      <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-        {alerts.map((alert) => {
+      <div className="max-h-[340px] overflow-y-auto divide-y" style={{ borderColor: "var(--border)" }}>
+        {alerts.filter((a) => !a.resolved).slice(0, 10).map((alert) => {
           const cfg = severityConfig[alert.severity];
           return (
             <div

@@ -10,6 +10,9 @@ interface ParkingAisleProps {
   hasLane: boolean;
   laneType?: "lane" | "road" | "grass";
   grid: ParkingSpotType[][];
+  offlineSpotIds: Set<number>;
+  heatmapOn?: boolean;
+  heatmapData?: Record<number, number>;
   selectedSpotId: number | null;
   onSpotClick: (spotId: number) => void;
 }
@@ -20,6 +23,9 @@ export default function ParkingAisle({
   hasLane,
   laneType = "lane",
   grid,
+  offlineSpotIds,
+  heatmapOn,
+  heatmapData,
   selectedSpotId,
   onSpotClick,
 }: ParkingAisleProps) {
@@ -29,6 +35,9 @@ export default function ParkingAisle({
         spots={grid[topRowIndex]}
         rowIndex={topRowIndex}
         facingUp={true}
+        offlineSpotIds={offlineSpotIds}
+        heatmapOn={heatmapOn}
+        heatmapData={heatmapData}
         selectedSpotId={selectedSpotId}
         onSpotClick={onSpotClick}
       />
@@ -37,6 +46,9 @@ export default function ParkingAisle({
           spots={grid[bottomRowIndex]}
           rowIndex={bottomRowIndex}
           facingUp={false}
+          offlineSpotIds={offlineSpotIds}
+          heatmapOn={heatmapOn}
+          heatmapData={heatmapData}
           selectedSpotId={selectedSpotId}
           onSpotClick={onSpotClick}
         />

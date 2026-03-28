@@ -26,81 +26,80 @@ struct ParkingSpot: Codable {
 // MARK: - Parking Lot Map
 class ParkingLotMap {
     /*
-     Layout (23 rows):
+     Layout (22 rows):
 
      Row Index | Description
      -------------------------------------------------------
      0         | Grass Lane (top edge)
-     1         | Handicap row (first/last 3 cols = grass, spots 1,3,5,6 HC, 2,4 unusable)
+     1         | Handicap row (first/last 3 cols = grass)
      2         | Road Lane
-     3         | Handicap row (first/last 3 cols = grass, spots 1,3,5,6 HC, 2,4 unusable)
-     4         | Driving Lane (separator)
-     5         | Single top row (no handicap)
-     6         | Driving Lane
-     7         | Pair top
-     8         | Pair bottom (col 9 = light pole)
-     9         | Driving Lane
-     10        | Pair top (col 0 unusable, col 1 handicap)
-     11        | Pair bottom (col 0 unusable, col 1 handicap)
-     12        | Driving Lane
-     13        | Pair top (normal)
-     14        | Pair bottom (normal)
-     15        | Driving Lane
-     16        | Pair top (col 0 unusable, col 1 handicap)
-     17        | Pair bottom (col 0 unusable, col 1 handicap)
-     18        | Driving Lane
-     19        | Pair top (col 0 unusable, col 1 handicap, col 8 = light pole)
-     20        | Pair bottom (col 0 unusable, col 1 handicap)
-     21        | Driving Lane
-     22        | Single bottom row (col 1 unusable, col 0 & col 2 handicap)
+     3         | Handicap row (first/last 3 cols = grass) — facing up
+     4         | Regular parking — facing down (paired with row 3)
+     5         | Driving Lane
+     6         | Pair top
+     7         | Pair bottom (col 9 = light pole)
+     8         | Driving Lane
+     9         | Pair top (col 0 unusable, col 1 handicap)
+     10        | Pair bottom (col 0 unusable, col 1 handicap)
+     11        | Driving Lane
+     12        | Pair top (normal)
+     13        | Pair bottom (normal)
+     14        | Driving Lane
+     15        | Pair top (col 0 unusable, col 1 handicap)
+     16        | Pair bottom (col 0 unusable, col 1 handicap)
+     17        | Driving Lane
+     18        | Pair top (col 0 unusable, col 1 handicap, col 8 = light pole)
+     19        | Pair bottom (col 0 unusable, col 1 handicap)
+     20        | Driving Lane
+     21        | Single bottom row (col 1 unusable, col 0 & col 2 handicap)
 
      Each row has 22 spots (columns 0-21)
     */
 
     static let spotsPerRow = 22
-    static let totalRows = 23
+    static let totalRows = 22
 
     // The 2D array backend
     var map: [[ParkingSpot]]
 
     // Parking row indices (actual spots, not driving lanes)
-    let parkingRowIndices = [1, 3, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22]
-    let drivingLaneIndices = [0, 2, 4, 6, 9, 12, 15, 18, 21]
+    let parkingRowIndices = [1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 21]
+    let drivingLaneIndices = [0, 2, 5, 8, 11, 14, 17, 20]
 
     // Handicap spot positions (row, column)
     let handicapPositions: [(row: Int, col: Int)] = [
-        // New handicap rows (rows 1, 3)
+        // Handicap rows (rows 1, 3)
         (1, 3), (1, 5), (1, 7), (1, 8),
         (3, 3), (3, 5), (3, 7), (3, 8),
-        // Existing lot
+        // Main lot
+        (9, 1),
         (10, 1),
-        (11, 1),
+        (15, 1),
         (16, 1),
-        (17, 1),
+        (18, 1),
         (19, 1),
-        (20, 1),
-        (22, 0),
-        (22, 2),
+        (21, 0),
+        (21, 2),
     ]
 
     // Not-a-spot positions within parking rows (light poles, unusable spaces)
     let notASpotPositions: [(row: Int, col: Int)] = [
-        // New handicap rows — access aisles
+        // Handicap rows — access aisles
         (1, 4), (1, 6),
         (3, 4), (3, 6),
-        // Existing lot
-        (8, 9),   // light pole
+        // Main lot
+        (7, 9),   // light pole
+        (9, 0),
         (10, 0),
-        (11, 0),
+        (15, 0),
         (16, 0),
-        (17, 0),
+        (18, 0),
+        (18, 8),  // light pole
         (19, 0),
-        (19, 8),  // light pole
-        (20, 0),
-        (22, 1),
+        (21, 1),
     ]
 
-    // Grass positions within parking rows (first 3 and last 3 cols on new rows)
+    // Grass positions within parking rows (first 3 and last 3 cols on handicap rows)
     let grassPositions: [(row: Int, col: Int)] = [
         (1, 0), (1, 1), (1, 2), (1, 19), (1, 20), (1, 21),
         (3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21),
@@ -220,7 +219,7 @@ class ParkingLotMap {
 
     // MARK: - Spot Numbering
 
-    static let parkingRowOrder = [1, 3, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22]
+    static let parkingRowOrder = [1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 21]
     static let totalNumberedSpots = parkingRowOrder.count * spotsPerRow  // 308
 
     /// Convert a spot number (1-308) to (row, col)
@@ -249,14 +248,13 @@ class ParkingLotMap {
 
         let aisles: [(top: Int, bottom: Int?, lane: Int?)] = [
             (1, nil, 2),
-            (3, nil, 4),
-            (5, nil, 6),
-            (7, 8, 9),
-            (10, 11, 12),
-            (13, 14, 15),
-            (16, 17, 18),
-            (19, 20, 21),
-            (22, nil, nil),
+            (3, 4, 5),
+            (6, 7, 8),
+            (9, 10, 11),
+            (12, 13, 14),
+            (15, 16, 17),
+            (18, 19, 20),
+            (21, nil, nil),
         ]
 
         for aisle in aisles {

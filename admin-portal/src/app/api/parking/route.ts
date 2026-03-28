@@ -36,7 +36,7 @@ export async function GET() {
       sensors,
       lastSync: new Date().toISOString(),
       piZeroStatus: realData ? "online" : "offline",
-      piFiveStatus: "online",
+      backendStatus: "online",
     },
     { headers: CORS_HEADERS }
   );

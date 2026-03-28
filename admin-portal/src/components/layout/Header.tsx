@@ -8,13 +8,13 @@ interface HeaderProps {
 export default function Header({ title, subtitle }: HeaderProps) {
   return (
     <header
-      className="h-16 flex items-center justify-between px-8 border-b shrink-0"
+      className="h-16 flex items-center justify-between px-4 md:px-8 border-b shrink-0"
       style={{
         backgroundColor: "var(--sidebar)",
         borderColor: "var(--border)",
       }}
     >
-      <div>
+      <div className="ml-10 md:ml-0">
         <h2
           className="text-lg font-semibold"
           style={{ color: "var(--text-primary)" }}
@@ -37,7 +37,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
               className="text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              Pi 5
+              Pi 0
             </span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -46,7 +46,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
               className="text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              Pi 0
+              API
             </span>
           </div>
         </div>

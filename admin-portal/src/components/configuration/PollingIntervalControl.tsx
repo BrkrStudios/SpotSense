@@ -15,7 +15,7 @@ export default function PollingIntervalControl({ value, onChange }: PollingInter
         Polling Interval
       </h3>
       <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>
-        How often Pi 0 reads the TOF sensor and sends data to Pi 5
+        How often Pi 0 reads the TOF sensor and sends data to Firebase
       </p>
 
       <div className="flex items-center gap-4">

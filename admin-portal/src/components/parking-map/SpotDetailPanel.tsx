@@ -80,12 +80,12 @@ export default function SpotDetailPanel({
               <div
                 className="w-2 h-2 rounded-full"
                 style={{
-                  backgroundColor: sensor.sensorOnline ? "#33BF4D" : "#D92626",
+                  backgroundColor: sensor.sensorOnline ? "#33BF4D" : "#E67E22",
                 }}
               />
               <span
                 className="text-sm"
-                style={{ color: "var(--text-primary)" }}
+                style={{ color: sensor.sensorOnline ? "var(--text-primary)" : "#E67E22" }}
               >
                 {sensor.sensorOnline ? "Online" : "Offline"}
               </span>
@@ -93,6 +93,11 @@ export default function SpotDetailPanel({
             <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
               Last updated: {relativeTime(sensor.lastUpdated)}
             </p>
+            {!sensor.sensorOnline && (
+              <p className="text-xs mt-1 font-medium" style={{ color: "#E67E22" }}>
+                Sensor not responding — data may be stale
+              </p>
+            )}
           </Section>
 
           {/* TOF Distance */}

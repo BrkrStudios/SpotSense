@@ -28,7 +28,7 @@ export interface ParkingLotData {
   sensors: Record<number, SensorReading>;
   lastSync: string;
   piZeroStatus: "online" | "offline" | "degraded";
-  piFiveStatus: "online" | "offline" | "degraded";
+  backendStatus: "online" | "offline" | "degraded";
 }
 
 export interface ParkingStats {
@@ -64,6 +64,34 @@ export interface Alert {
     | "connection_lost"
     | "occupancy_threshold"
     | "system";
+  resolved?: boolean;
+  resolvedAt?: string;
+}
+
+export interface ActivityEvent {
+  id: string;
+  timestamp: string;
+  spotId: number;
+  oldStatus: SpotStatus;
+  newStatus: SpotStatus;
+  isHandicap: boolean;
+}
+
+export interface DailyOccupancyProfile {
+  date: string;
+  dayOfWeek: number;
+  points: OccupancyDataPoint[];
+  peakOccupied: number;
+  peakHour: number;
+  avgOccupancy: number;
+  turnoverRate: number;
+}
+
+export interface WeeklyStats {
+  avgOccupancyByDay: number[];
+  peakHourByDay: number[];
+  busiestDay: number;
+  avgTurnoverRate: number;
 }
 
 export interface OccupancyDataPoint {

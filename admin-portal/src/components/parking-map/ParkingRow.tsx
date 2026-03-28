@@ -9,6 +9,9 @@ interface ParkingRowProps {
   spots: ParkingSpotType[];
   rowIndex: number;
   facingUp: boolean;
+  offlineSpotIds: Set<number>;
+  heatmapOn?: boolean;
+  heatmapData?: Record<number, number>;
   selectedSpotId: number | null;
   onSpotClick: (spotId: number) => void;
 }
@@ -17,6 +20,9 @@ export default function ParkingRow({
   spots,
   rowIndex,
   facingUp,
+  offlineSpotIds,
+  heatmapOn,
+  heatmapData,
   selectedSpotId,
   onSpotClick,
 }: ParkingRowProps) {
@@ -32,6 +38,9 @@ export default function ParkingRow({
             col={col}
             facingUp={facingUp}
             spotNumber={spotNum}
+            isSensorOffline={offlineSpotIds.has(spotNum)}
+            heatmapOn={heatmapOn}
+            heatValue={heatmapData?.[spotNum]}
             isSelected={selectedSpotId === spotNum}
             onClick={() => onSpotClick(spotNum)}
           />

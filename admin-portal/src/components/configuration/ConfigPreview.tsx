@@ -19,7 +19,7 @@ export default function ConfigPreview({ config }: ConfigPreviewProps) {
           Config Preview
         </h3>
         <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-          JSON payload that will be sent to Pi 5
+          JSON payload that will be deployed to Pi 0
         </p>
       </div>
       <pre

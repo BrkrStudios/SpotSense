@@ -2,7 +2,9 @@
 
 import { ParkingSpot as ParkingSpotType, SpotStatus } from "@/lib/types";
 import { SPOT_WIDTH, SPOT_HEIGHT, LINE_WIDTH, COLORS, SPOTS_PER_ROW, NOT_A_SPOT_POSITIONS, GRASS_POSITIONS } from "@/lib/constants";
-import { spotColor } from "@/lib/utils";
+import { spotColor, heatColor } from "@/lib/utils";
+
+const OFFLINE_COLOR = "#E67E22"; // orange for offline sensors
 
 interface ParkingSpotProps {
   spot: ParkingSpotType;
@@ -10,6 +12,9 @@ interface ParkingSpotProps {
   col: number;
   facingUp: boolean;
   spotNumber: number;
+  isSensorOffline?: boolean;
+  heatmapOn?: boolean;
+  heatValue?: number;
   isSelected?: boolean;
   onClick?: () => void;
 }
@@ -20,11 +25,18 @@ export default function ParkingSpot({
   col,
   facingUp,
   spotNumber,
+  isSensorOffline,
+  heatmapOn,
+  heatValue,
   isSelected,
   onClick,
 }: ParkingSpotProps) {
   const isLastColumn = col === SPOTS_PER_ROW - 1;
-  const color = spotColor(spot);
+  const color = isSensorOffline
+    ? OFFLINE_COLOR
+    : heatmapOn
+    ? heatColor(heatValue ?? 0)
+    : spotColor(spot);
   const isUnusable = NOT_A_SPOT_POSITIONS.some(([r, c]) => r === row && c === col);
   const isGrass = GRASS_POSITIONS.some(([r, c]) => r === row && c === col);
 

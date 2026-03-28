@@ -2,18 +2,20 @@
 
 interface StatCardProps {
   label: string;
-  value: number;
+  value: number | string;
   total?: number;
   color: string;
   icon: React.ReactNode;
+  subtitle?: string;
+  progressPercent?: number;
 }
 
-export default function StatCard({ label, value, total, color, icon }: StatCardProps) {
-  const percentage = total ? Math.round((value / total) * 100) : null;
+export default function StatCard({ label, value, total, color, icon, subtitle, progressPercent }: StatCardProps) {
+  const percentage = progressPercent ?? (typeof value === "number" && total ? Math.round((value / total) * 100) : null);
 
   return (
     <div
-      className="rounded-xl p-5 border"
+      className="rounded-xl p-4 md:p-5 border overflow-hidden"
       style={{
         backgroundColor: "var(--sidebar)",
         borderColor: "var(--border)",
@@ -31,26 +33,33 @@ export default function StatCard({ label, value, total, color, icon }: StatCardP
         </div>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold tabular-nums" style={{ color }}>
+        <span className="text-2xl md:text-3xl font-bold tabular-nums" style={{ color }}>
           {value}
         </span>
-        {total && (
+        {typeof value === "number" && total && (
           <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
             / {total}
           </span>
         )}
       </div>
+      {subtitle && (
+        <span className="text-xs mt-1 block" style={{ color: "var(--text-secondary)" }}>
+          {subtitle}
+        </span>
+      )}
       {percentage !== null && (
         <div className="mt-3">
           <div className="w-full h-1.5 rounded-full" style={{ backgroundColor: "var(--surface)" }}>
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${percentage}%`, backgroundColor: color }}
+              style={{ width: `${Math.min(100, percentage)}%`, backgroundColor: color }}
             />
           </div>
-          <span className="text-xs mt-1 block" style={{ color: "var(--text-secondary)" }}>
-            {percentage}%
-          </span>
+          {!subtitle && (
+            <span className="text-xs mt-1 block" style={{ color: "var(--text-secondary)" }}>
+              {percentage}%
+            </span>
+          )}
         </div>
       )}
     </div>

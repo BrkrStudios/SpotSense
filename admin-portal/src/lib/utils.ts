@@ -49,6 +49,26 @@ export function seededRandom(seed: number): () => number {
   };
 }
 
+/** Map a 0-1 fraction to a heat color: blue → green → yellow → red */
+export function heatColor(fraction: number): string {
+  const f = Math.max(0, Math.min(1, fraction));
+  // 4-stop gradient
+  const stops: [number, number, number][] = [
+    [59, 130, 246],   // 0.0 = blue  (#3B82F6)
+    [34, 197, 94],    // 0.33 = green (#22C55E)
+    [234, 179, 8],    // 0.66 = yellow (#EAB308)
+    [220, 38, 38],    // 1.0 = red  (#DC2626)
+  ];
+  const idx = f * (stops.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.min(lo + 1, stops.length - 1);
+  const t = idx - lo;
+  const r = Math.round(stops[lo][0] + t * (stops[hi][0] - stops[lo][0]));
+  const g = Math.round(stops[lo][1] + t * (stops[hi][1] - stops[lo][1]));
+  const b = Math.round(stops[lo][2] + t * (stops[hi][2] - stops[lo][2]));
+  return `rgb(${r},${g},${b})`;
+}
+
 /** Format a date as relative time (e.g., "2m ago") */
 export function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

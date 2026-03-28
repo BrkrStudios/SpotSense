@@ -28,7 +28,7 @@ struct ParkingAPIResponse: Codable {
     let grid: [[ParkingAPISpot]]
     let lastSync: String
     let piZeroStatus: String
-    let piFiveStatus: String
+    let backendStatus: String
 }
 
 // MARK: - API Service

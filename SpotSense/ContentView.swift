@@ -111,7 +111,7 @@ struct ParkingLotDetailView: View {
         let targetScale: CGFloat = 2.5
         let parkingWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
         let mapWidth = ParkingLotLayout.roadWidth + parkingWidth + ParkingLotLayout.roadWidth
-        let mapHeight = ParkingLotLayout.laneHeight + 14 * ParkingLotLayout.spotHeight + 8 * ParkingLotLayout.laneHeight
+        let mapHeight = ParkingLotLayout.laneHeight + 14 * ParkingLotLayout.spotHeight + 7 * ParkingLotLayout.laneHeight
         let mapCenter = CGPoint(x: mapWidth / 2, y: mapHeight / 2)
 
         let targetOffset = CGSize(
@@ -288,13 +288,12 @@ struct ParkingLotView: View {
     static let laneTypes: [Int: LaneType] = [
         0: .grass,
         2: .road,
-        4: .lane,
-        6: .lane,
-        9: .lane,
-        12: .lane,
-        15: .lane,
-        18: .lane,
-        21: .lane,
+        5: .lane,
+        8: .lane,
+        11: .lane,
+        14: .lane,
+        17: .lane,
+        20: .lane,
     ]
 
     // Grass positions for spot-level rendering
@@ -312,14 +311,13 @@ struct ParkingLotView: View {
 
     let aisles: [(top: Int, bottom: Int?, lane: Int?)] = [
         (1, nil, 2),
-        (3, nil, 4),
-        (5, nil, 6),
-        (7, 8, 9),
-        (10, 11, 12),
-        (13, 14, 15),
-        (16, 17, 18),
-        (19, 20, 21),
-        (22, nil, nil),
+        (3, 4, 5),
+        (6, 7, 8),
+        (9, 10, 11),
+        (12, 13, 14),
+        (15, 16, 17),
+        (18, 19, 20),
+        (21, nil, nil),
     ]
 
     let parkingWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
