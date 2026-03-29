@@ -65,7 +65,7 @@ export default function ConfigurationPage() {
                   opacity: isSaving ? 0.7 : 1,
                 }}
               >
-                {isSaving ? "Deploying..." : "Save & Deploy to Pi 0"}
+                {isSaving ? "Deploying..." : "Save & Deploy to Pi Zeros"}
               </button>
 
               {showSuccess && (
@@ -100,7 +100,7 @@ export default function ConfigurationPage() {
                 </li>
                 <li>
                   <strong style={{ color: "var(--text-primary)" }}>Spot Designations:</strong>{" "}
-                  Mark spots as handicap, out of service, or reserved. Changes are sent to Pi 0 via Railway API.
+                  Mark spots as handicap, out of service, or reserved. Changes are sent to Pi Zeros via Firebase.
                 </li>
                 <li>
                   <strong style={{ color: "var(--text-primary)" }}>Demo Mode:</strong>{" "}

@@ -1,105 +1,113 @@
-import { SensorReading, SpotStatus } from "./types";
-
 /**
- * Embedded sensor data from Pi Zero (spotsense-zero-001).
- * This is the real data for spot #308 (row 22, col 21).
- * When SENSOR_API_URL is set, this will be replaced by a live fetch.
+ * Server-only sensor data fetching.
+ * This file imports firebase-admin and CANNOT be used in "use client" components.
+ * For client-safe config, import from "./sensor-config" instead.
  */
-const EMBEDDED_SENSOR_DATA = {
-  spots: [
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 113, timestamp: "2026-03-24T23:48:23.371761+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 234, timestamp: "2026-03-24T23:48:27.149311+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 169, timestamp: "2026-03-24T23:48:24.436282+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 232, timestamp: "2026-03-24T23:48:26.051175+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: false, distanceMm: 66,  timestamp: "2026-03-24T23:48:11.305685+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 239, timestamp: "2026-03-24T23:48:26.612888+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: false, distanceMm: 179, timestamp: "2026-03-24T23:48:13.400455+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 226, timestamp: "2026-03-24T23:48:25.507511+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 59,  timestamp: "2026-03-24T23:48:22.783591+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 261, timestamp: "2026-03-24T23:48:30.982808+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 270, timestamp: "2026-03-24T23:48:30.434196+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 263, timestamp: "2026-03-24T23:48:29.906438+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 301, timestamp: "2026-03-24T23:48:29.374754+00:00" },
-    { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 271, timestamp: "2026-03-24T23:48:28.820108+00:00" },
-    { spotId: null,  deviceId: null,                  occupied: true,  distanceMm: null, timestamp: 1773360992 },
-  ],
-};
+
+import { SensorReading, SpotStatus } from "./types";
+import { fetchLatestReadings } from "./firebase";
+import { REAL_SPOTS } from "./sensor-config";
+
+// Re-export everything from sensor-config for server-side consumers
+export {
+  REAL_SPOTS,
+  REAL_SPOT_IDS,
+  isRealSpot,
+  isRealSpotPosition,
+  getRealSpotByNumber,
+} from "./sensor-config";
+export type { RealSpotConfig } from "./sensor-config";
+
+/* ------------------------------------------------------------------ */
+/*  Embedded fallback data (used when Firebase is unreachable)         */
+/* ------------------------------------------------------------------ */
 
 interface RawSensorEntry {
-  spotId: string | null;
-  deviceId: string | null;
+  spotId: string;
+  deviceId: string;
   occupied: boolean;
-  distanceMm: number | null;
-  timestamp: string | number;
+  distanceMm: number;
+  timestamp: string;
 }
 
-/** The spot number in our grid that maps to the real sensor */
-export const REAL_SPOT_ID = 308;
-export const REAL_SPOT_ROW = 21;
-export const REAL_SPOT_COL = 21;
+const EMBEDDED_SENSOR_DATA: RawSensorEntry[] = [
+  // A12 readings (spotsense-zero-001)
+  { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 113, timestamp: "2026-03-24T23:48:23.371761+00:00" },
+  { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 234, timestamp: "2026-03-24T23:48:27.149311+00:00" },
+  { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 169, timestamp: "2026-03-24T23:48:24.436282+00:00" },
+  { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 232, timestamp: "2026-03-24T23:48:26.051175+00:00" },
+  { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 261, timestamp: "2026-03-24T23:48:30.982808+00:00" },
+  { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 217, timestamp: "2026-03-24T23:48:27.699422+00:00" },
+  // B1 readings (spotsense-zero-002)
+  { spotId: "B1",  deviceId: "spotsense-zero-002", occupied: false, distanceMm: 1500, timestamp: "2026-03-28T16:34:38.498363+00:00" },
+  { spotId: "B1",  deviceId: "spotsense-zero-002", occupied: true,  distanceMm: 40,   timestamp: "2026-03-28T02:44:07.538000+00:00" },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Data fetching                                                       */
+/* ------------------------------------------------------------------ */
 
 /**
- * Get the latest valid reading from the sensor data.
- * Filters out entries with null spotId, then picks the most recent by timestamp.
+ * Fetch real sensor data for ALL real spots.
+ * Tries Firebase first, falls back to embedded data if Firestore is unreachable.
+ * Returns a Record keyed by spot number.
  */
-function getLatestReading(entries: RawSensorEntry[]): RawSensorEntry | null {
-  const valid = entries.filter(
-    (e) => e.spotId !== null && e.deviceId !== null && typeof e.timestamp === "string"
-  );
-  if (valid.length === 0) return null;
+export async function getRealSpotsData(): Promise<
+  Record<number, { status: SpotStatus; sensor: SensorReading }>
+> {
+  const result: Record<number, { status: SpotStatus; sensor: SensorReading }> = {};
+  const firebaseSpotIds = REAL_SPOTS.map((s) => s.firebaseSpotId);
 
-  valid.sort((a, b) => {
-    const ta = new Date(a.timestamp as string).getTime();
-    const tb = new Date(b.timestamp as string).getTime();
-    return tb - ta;
-  });
+  let readings: Record<string, { occupied: boolean; distanceMm: number; timestamp: string }>;
 
-  return valid[0];
-}
-
-/**
- * Fetch real sensor data for spot #308.
- * If SENSOR_API_URL is set, fetches live from the Railway FastAPI endpoint.
- * Otherwise uses embedded data as fallback.
- */
-export async function getRealSpotData(): Promise<{
-  status: SpotStatus;
-  sensor: SensorReading;
-} | null> {
-  let entries: RawSensorEntry[];
-
-  const sensorUrl = process.env.SENSOR_API_URL;
-  if (sensorUrl) {
-    try {
-      const res = await fetch(sensorUrl, { next: { revalidate: 0 } });
-      const data = await res.json();
-      entries = data.spots;
-    } catch {
-      // Fall back to embedded data if fetch fails
-      entries = EMBEDDED_SENSOR_DATA.spots;
+  try {
+    const firebaseData = await fetchLatestReadings(firebaseSpotIds);
+    readings = {};
+    for (const [spotId, data] of Object.entries(firebaseData)) {
+      readings[spotId] = {
+        occupied: data.occupied,
+        distanceMm: data.distanceMm,
+        timestamp: data.timestamp,
+      };
     }
-  } else {
-    entries = EMBEDDED_SENSOR_DATA.spots;
+  } catch (err) {
+    console.error("[sensor] Firebase fetch failed, using embedded fallback:", err);
+    // Build readings from embedded data — pick latest per spotId
+    readings = {};
+    for (const entry of EMBEDDED_SENSOR_DATA) {
+      const existing = readings[entry.spotId];
+      if (!existing || new Date(entry.timestamp) > new Date(existing.timestamp)) {
+        readings[entry.spotId] = {
+          occupied: entry.occupied,
+          distanceMm: entry.distanceMm,
+          timestamp: entry.timestamp,
+        };
+      }
+    }
   }
 
-  const latest = getLatestReading(entries);
-  if (!latest) return null;
+  // Map Firebase readings to our real spot configs
+  for (const config of REAL_SPOTS) {
+    const reading = readings[config.firebaseSpotId];
+    if (!reading) continue;
 
-  const isOccupied = latest.occupied;
+    const isOccupied = reading.occupied;
+    result[config.spotNumber] = {
+      status: isOccupied ? SpotStatus.Occupied : SpotStatus.Available,
+      sensor: {
+        spotId: config.spotNumber,
+        row: config.row,
+        col: config.col,
+        distanceMm: reading.distanceMm ?? 0,
+        objectDetected: isOccupied,
+        cameraSnapshotUrl: null,
+        lastUpdated: reading.timestamp,
+        batteryPercent: null,
+        sensorOnline: true,
+        consecutiveDetections: isOccupied ? 5 : 0,
+      },
+    };
+  }
 
-  return {
-    status: isOccupied ? SpotStatus.Occupied : SpotStatus.Available,
-    sensor: {
-      spotId: REAL_SPOT_ID,
-      row: REAL_SPOT_ROW,
-      col: REAL_SPOT_COL,
-      distanceMm: latest.distanceMm ?? 0,
-      objectDetected: isOccupied,
-      cameraSnapshotUrl: null,
-      lastUpdated: latest.timestamp as string,
-      batteryPercent: null,
-      sensorOnline: true,
-      consecutiveDetections: isOccupied ? 5 : 0,
-    },
-  };
+  return result;
 }

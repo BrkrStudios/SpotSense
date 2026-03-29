@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMockParkingData } from "@/lib/mock-data";
-import { getRealSpotData, REAL_SPOT_ROW, REAL_SPOT_COL, REAL_SPOT_ID } from "@/lib/sensor";
+import { REAL_SPOTS, getRealSpotsData } from "@/lib/sensor";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -20,22 +20,34 @@ export async function GET() {
   const grid = data.grid.map((row) => row.map((spot) => ({ ...spot })));
   const sensors = { ...data.sensors };
 
-  // Overlay real sensor data for spot #220
-  const realData = await getRealSpotData();
-  if (realData) {
-    grid[REAL_SPOT_ROW][REAL_SPOT_COL] = {
-      status: realData.status,
-      isHandicap: false,
-    };
-    sensors[REAL_SPOT_ID] = realData.sensor;
+  // Overlay real sensor data for all real spots
+  const realDataMap = await getRealSpotsData();
+
+  for (const config of REAL_SPOTS) {
+    const realData = realDataMap[config.spotNumber];
+    if (realData) {
+      grid[config.row][config.col] = {
+        status: realData.status,
+        isHandicap: false,
+      };
+      sensors[config.spotNumber] = realData.sensor;
+    }
   }
+
+  const onlineCount = Object.keys(realDataMap).length;
+  const piZeroStatus =
+    onlineCount === REAL_SPOTS.length
+      ? "online"
+      : onlineCount > 0
+        ? "degraded"
+        : "offline";
 
   return NextResponse.json(
     {
       grid,
       sensors,
       lastSync: new Date().toISOString(),
-      piZeroStatus: realData ? "online" : "offline",
+      piZeroStatus,
       backendStatus: "online",
     },
     { headers: CORS_HEADERS }

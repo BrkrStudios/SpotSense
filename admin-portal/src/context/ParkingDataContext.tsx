@@ -20,10 +20,9 @@ import {
 import { getMockParkingData, getMockAlerts } from "@/lib/mock-data";
 import { spotNumberForPosition } from "@/lib/utils";
 import {
-  REAL_SPOT_ID,
-  REAL_SPOT_ROW,
-  REAL_SPOT_COL,
-} from "@/lib/sensor";
+  REAL_SPOTS,
+  isRealSpotPosition,
+} from "@/lib/sensor-config";
 import { useServerTime } from "@/hooks/useServerTime";
 import { DAY_PROFILES, interpolateProfile } from "@/lib/occupancy-profiles";
 
@@ -56,6 +55,7 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
 
   // Track which alerts we've already generated to avoid duplicates
   const generatedAlertKeysRef = useRef<Set<string>>(new Set());
+  const eventCounterRef = useRef(0);
 
   const resolveAlert = useCallback((alertId: string) => {
     setAlerts((prev) =>
@@ -106,7 +106,7 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
             ];
           const col = Math.floor(Math.random() * SPOTS_PER_ROW);
 
-          if (rowIdx === REAL_SPOT_ROW && col === REAL_SPOT_COL) continue;
+          if (isRealSpotPosition(rowIdx, col)) continue;
 
           // Skip offline sensors — they can't report changes
           const spotId = spotNumberForPosition(rowIdx, col);
@@ -133,8 +133,9 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
 
           // Capture activity event if status changed
           if (spotId && newGrid[rowIdx][col].status !== oldStatus) {
+            eventCounterRef.current++;
             newEvents.push({
-              id: `${Date.now()}-${spotId}`,
+              id: `${Date.now()}-${spotId}-${eventCounterRef.current}`,
               timestamp: new Date().toISOString(),
               spotId,
               oldStatus,
@@ -160,7 +161,7 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
         // Sync sensor readings — only for online sensors
         for (const rowIdx of PARKING_ROW_INDICES) {
           for (let col = 0; col < SPOTS_PER_ROW; col++) {
-            if (rowIdx === REAL_SPOT_ROW && col === REAL_SPOT_COL) continue;
+            if (isRealSpotPosition(rowIdx, col)) continue;
             const sid = spotNumberForPosition(rowIdx, col);
             if (!sid || !newSensors[sid]) continue;
             // Don't update offline sensors
@@ -274,29 +275,31 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Poll real sensor data every 3 seconds
+  // Poll real sensor data every 3 seconds for all real spots
   useEffect(() => {
-    const fetchRealSpot = async () => {
-      try {
-        const res = await fetch(`/api/parking/spot/${REAL_SPOT_ID}`);
-        if (!res.ok) return;
-        const sensor = await res.json();
-        setData((prev) => {
-          const newGrid = prev.grid.map((row) => row.map((s) => ({ ...s })));
-          newGrid[REAL_SPOT_ROW][REAL_SPOT_COL] = {
-            status: sensor.objectDetected ? SpotStatus.Occupied : SpotStatus.Available,
-            isHandicap: false,
-          };
-          const newSensors = { ...prev.sensors, [REAL_SPOT_ID]: sensor };
-          return { ...prev, grid: newGrid, sensors: newSensors };
-        });
-      } catch {
-        // Will retry next interval
+    const fetchRealSpots = async () => {
+      for (const config of REAL_SPOTS) {
+        try {
+          const res = await fetch(`/api/parking/spot/${config.spotNumber}`);
+          if (!res.ok) continue;
+          const sensor = await res.json();
+          setData((prev) => {
+            const newGrid = prev.grid.map((row) => row.map((s) => ({ ...s })));
+            newGrid[config.row][config.col] = {
+              status: sensor.objectDetected ? SpotStatus.Occupied : SpotStatus.Available,
+              isHandicap: false,
+            };
+            const newSensors = { ...prev.sensors, [config.spotNumber]: sensor };
+            return { ...prev, grid: newGrid, sensors: newSensors };
+          });
+        } catch {
+          // Will retry next interval
+        }
       }
     };
 
-    fetchRealSpot();
-    const interval = setInterval(fetchRealSpot, 3000);
+    fetchRealSpots();
+    const interval = setInterval(fetchRealSpots, 3000);
     return () => clearInterval(interval);
   }, []);
 

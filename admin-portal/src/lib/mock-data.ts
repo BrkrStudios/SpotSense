@@ -22,6 +22,7 @@ import {
   TOTAL_NUMBERED_SPOTS,
 } from "./constants";
 import { spotNumberForPosition, seededRandom } from "./utils";
+import { REAL_SPOTS } from "./sensor-config";
 
 const UNUSABLE_COUNT = NOT_A_SPOT_POSITIONS.length + GRASS_POSITIONS.length;
 
@@ -122,6 +123,10 @@ function buildSensors(
   while (offlineSet.size < numOffline) {
     const idx = Math.floor(rand() * allUsableSpots.length);
     offlineSet.add(allUsableSpots[idx]);
+  }
+  // Never mark real hardware spots as offline
+  for (const config of REAL_SPOTS) {
+    offlineSet.delete(config.spotNumber);
   }
 
   for (const row of PARKING_ROW_INDICES) {

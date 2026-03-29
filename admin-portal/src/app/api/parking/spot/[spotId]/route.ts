@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMockParkingData } from "@/lib/mock-data";
-import { getRealSpotData, REAL_SPOT_ID } from "@/lib/sensor";
+import { isRealSpot, getRealSpotsData } from "@/lib/sensor";
+import { TOTAL_NUMBERED_SPOTS } from "@/lib/constants";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -19,16 +20,17 @@ export async function GET(
   const { spotId: spotIdStr } = await params;
   const spotId = parseInt(spotIdStr, 10);
 
-  if (isNaN(spotId) || spotId < 1 || spotId > 308) {
+  if (isNaN(spotId) || spotId < 1 || spotId > TOTAL_NUMBERED_SPOTS) {
     return NextResponse.json(
       { error: "Invalid spot ID" },
       { status: 400, headers: CORS_HEADERS }
     );
   }
 
-  // For spot #220, return real sensor data
-  if (spotId === REAL_SPOT_ID) {
-    const realData = await getRealSpotData();
+  // For real spots, return live Firebase data
+  if (isRealSpot(spotId)) {
+    const realDataMap = await getRealSpotsData();
+    const realData = realDataMap[spotId];
     if (realData) {
       return NextResponse.json(realData.sensor, { headers: CORS_HEADERS });
     }

@@ -20,10 +20,9 @@ import {
 import { getMockParkingData, getMockAlerts } from "@/lib/mock-data";
 import { spotNumberForPosition } from "@/lib/utils";
 import {
-  REAL_SPOT_ID,
-  REAL_SPOT_ROW,
-  REAL_SPOT_COL,
-} from "@/lib/sensor";
+  REAL_SPOTS,
+  isRealSpotPosition,
+} from "@/lib/sensor-config";
 
 /**
  * Provides live-updating parking data.
@@ -51,7 +50,7 @@ export function useLiveParkingData(serverTime: Date | null) {
           const col = Math.floor(Math.random() * SPOTS_PER_ROW);
 
           // Never toggle the real sensor spot
-          if (rowIdx === REAL_SPOT_ROW && col === REAL_SPOT_COL) continue;
+          if (isRealSpotPosition(rowIdx, col)) continue;
 
           const spot = newGrid[rowIdx][col];
 
@@ -77,7 +76,7 @@ export function useLiveParkingData(serverTime: Date | null) {
         const newSensors = { ...prev.sensors };
         for (const rowIdx of PARKING_ROW_INDICES) {
           for (let col = 0; col < SPOTS_PER_ROW; col++) {
-            if (rowIdx === REAL_SPOT_ROW && col === REAL_SPOT_COL) continue;
+            if (isRealSpotPosition(rowIdx, col)) continue;
             const spotId = spotNumberForPosition(rowIdx, col);
             if (!spotId || !newSensors[spotId]) continue;
             const spot = newGrid[rowIdx][col];
@@ -109,29 +108,31 @@ export function useLiveParkingData(serverTime: Date | null) {
     return () => clearInterval(interval);
   }, []);
 
-  // Poll real sensor data for spot #220 every 3 seconds
+  // Poll real sensor data for all real spots every 3 seconds
   useEffect(() => {
-    const fetchRealSpot = async () => {
-      try {
-        const res = await fetch(`/api/parking/spot/${REAL_SPOT_ID}`);
-        if (!res.ok) return;
-        const sensor = await res.json();
-        setData((prev) => {
-          const newGrid = prev.grid.map((row) => row.map((s) => ({ ...s })));
-          newGrid[REAL_SPOT_ROW][REAL_SPOT_COL] = {
-            status: sensor.objectDetected ? SpotStatus.Occupied : SpotStatus.Available,
-            isHandicap: false,
-          };
-          const newSensors = { ...prev.sensors, [REAL_SPOT_ID]: sensor };
-          return { ...prev, grid: newGrid, sensors: newSensors };
-        });
-      } catch {
-        // Silently ignore fetch errors — will retry next interval
+    const fetchRealSpots = async () => {
+      for (const config of REAL_SPOTS) {
+        try {
+          const res = await fetch(`/api/parking/spot/${config.spotNumber}`);
+          if (!res.ok) continue;
+          const sensor = await res.json();
+          setData((prev) => {
+            const newGrid = prev.grid.map((row) => row.map((s) => ({ ...s })));
+            newGrid[config.row][config.col] = {
+              status: sensor.objectDetected ? SpotStatus.Occupied : SpotStatus.Available,
+              isHandicap: false,
+            };
+            const newSensors = { ...prev.sensors, [config.spotNumber]: sensor };
+            return { ...prev, grid: newGrid, sensors: newSensors };
+          });
+        } catch {
+          // Silently ignore — will retry next interval
+        }
       }
     };
 
-    fetchRealSpot();
-    const interval = setInterval(fetchRealSpot, 3000);
+    fetchRealSpots();
+    const interval = setInterval(fetchRealSpots, 3000);
     return () => clearInterval(interval);
   }, []);
 
