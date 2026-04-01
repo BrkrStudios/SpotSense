@@ -19,10 +19,6 @@ import {
 } from "@/lib/constants";
 import { getMockParkingData, getMockAlerts } from "@/lib/mock-data";
 import { spotNumberForPosition } from "@/lib/utils";
-import {
-  REAL_SPOTS,
-  isRealSpotPosition,
-} from "@/lib/sensor-config";
 import { useServerTime } from "@/hooks/useServerTime";
 import { DAY_PROFILES, interpolateProfile } from "@/lib/occupancy-profiles";
 
@@ -55,7 +51,6 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
 
   // Track which alerts we've already generated to avoid duplicates
   const generatedAlertKeysRef = useRef<Set<string>>(new Set());
-  const eventCounterRef = useRef(0);
 
   const resolveAlert = useCallback((alertId: string) => {
     setAlerts((prev) =>
@@ -65,241 +60,102 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  // Toggle a few random spots every 3-5 seconds.
-  // Biases toward the day profile's target occupancy so the lot fills/empties realistically.
-  // Skips offline sensors — they don't update.
+  // Poll the server-side simulation every 3 seconds.
+  // The simulation runs on the server (parking-simulation.ts), so both the admin portal
+  // and iOS app see identical state from the same /api/parking endpoint.
   useEffect(() => {
-    const usableSpots = TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length;
+    const fetchState = async () => {
+      try {
+        const res = await fetch("/api/parking");
+        if (!res.ok) return;
+        const state = await res.json();
 
-    const interval = setInterval(() => {
-      setData((prev) => {
-        const newEvents: ActivityEvent[] = [];
-        const newGrid = prev.grid.map((row) => row.map((spot) => ({ ...spot })));
-        const newSensors = { ...prev.sensors };
+        setData({
+          grid: state.grid,
+          sensors: state.sensors,
+          lastSync: state.lastSync,
+          piZeroStatus: state.piZeroStatus,
+          backendStatus: state.backendStatus,
+        });
 
-        // Calculate current occupancy and target from day profile
-        const now = new Date();
-        const hour = now.getHours() + now.getMinutes() / 60;
-        const dayOfWeek = now.getDay();
-        const profile = DAY_PROFILES[dayOfWeek];
-        const targetFraction = interpolateProfile(profile, hour);
-        const targetOccupied = Math.round(targetFraction * usableSpots);
-
-        // Count current occupied
-        let currentOccupied = 0;
-        for (const rowIdx of PARKING_ROW_INDICES) {
-          for (let col = 0; col < SPOTS_PER_ROW; col++) {
-            if (newGrid[rowIdx][col].status === SpotStatus.Occupied) currentOccupied++;
-          }
+        if (state.activityFeed) {
+          setActivityFeed(state.activityFeed);
         }
 
-        // Bias: if below target, prefer filling; if above, prefer emptying
-        const needMore = currentOccupied < targetOccupied;
-        const diff = Math.abs(currentOccupied - targetOccupied);
-        // More changes when further from target
-        const numChanges = diff > 20 ? 3 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 3);
+        setTickCount(state.tickCount ?? 0);
 
-        for (let i = 0; i < numChanges; i++) {
-          const rowIdx =
-            PARKING_ROW_INDICES[
-              Math.floor(Math.random() * PARKING_ROW_INDICES.length)
-            ];
-          const col = Math.floor(Math.random() * SPOTS_PER_ROW);
-
-          if (isRealSpotPosition(rowIdx, col)) continue;
-
-          // Skip offline sensors — they can't report changes
-          const spotId = spotNumberForPosition(rowIdx, col);
-          if (spotId && newSensors[spotId] && !newSensors[spotId].sensorOnline) continue;
-
-          const spot = newGrid[rowIdx][col];
-          if (spot.status === SpotStatus.NotASpot) continue;
-          const oldStatus = spot.status;
-
-          if (spot.status === SpotStatus.Occupied && (!needMore || Math.random() < 0.2)) {
-            newGrid[rowIdx][col] = {
-              status: spot.isHandicap ? SpotStatus.Handicap : SpotStatus.Available,
-              isHandicap: spot.isHandicap,
-            };
-          } else if (
-            (spot.status === SpotStatus.Available || spot.status === SpotStatus.Handicap) &&
-            (needMore || Math.random() < 0.2)
-          ) {
-            newGrid[rowIdx][col] = {
-              status: SpotStatus.Occupied,
-              isHandicap: spot.isHandicap,
-            };
-          }
-
-          // Capture activity event if status changed
-          if (spotId && newGrid[rowIdx][col].status !== oldStatus) {
-            eventCounterRef.current++;
-            newEvents.push({
-              id: `${Date.now()}-${spotId}-${eventCounterRef.current}`,
-              timestamp: new Date().toISOString(),
-              spotId,
-              oldStatus,
-              newStatus: newGrid[rowIdx][col].status,
-              isHandicap: newGrid[rowIdx][col].isHandicap,
-            });
-          }
-        }
-
-        // Update heatmap accumulator
+        // Update heatmap accumulator from polled grid
         const acc = heatmapAccRef.current;
         for (const rowIdx of PARKING_ROW_INDICES) {
           for (let col = 0; col < SPOTS_PER_ROW; col++) {
             const sid = spotNumberForPosition(rowIdx, col);
             if (!sid) continue;
-            if (newGrid[rowIdx][col].status === SpotStatus.NotASpot) continue;
+            if (state.grid[rowIdx][col].status === SpotStatus.NotASpot) continue;
             if (!acc[sid]) acc[sid] = { occupied: 0, total: 0 };
             acc[sid].total++;
-            if (newGrid[rowIdx][col].status === SpotStatus.Occupied) acc[sid].occupied++;
+            if (state.grid[rowIdx][col].status === SpotStatus.Occupied) acc[sid].occupied++;
           }
         }
-
-        // Sync sensor readings — only for online sensors
-        for (const rowIdx of PARKING_ROW_INDICES) {
-          for (let col = 0; col < SPOTS_PER_ROW; col++) {
-            if (isRealSpotPosition(rowIdx, col)) continue;
-            const sid = spotNumberForPosition(rowIdx, col);
-            if (!sid || !newSensors[sid]) continue;
-            // Don't update offline sensors
-            if (!newSensors[sid].sensorOnline) continue;
-            const spot = newGrid[rowIdx][col];
-            const isOccupied = spot.status === SpotStatus.Occupied;
-            newSensors[sid] = {
-              ...newSensors[sid],
-              distanceMm: isOccupied
-                ? Math.floor(50 + Math.random() * 350)
-                : Math.floor(1200 + Math.random() * 800),
-              objectDetected: isOccupied,
-              consecutiveDetections: isOccupied
-                ? Math.floor(3 + Math.random() * 7)
-                : 0,
-              lastUpdated: new Date().toISOString(),
-            };
-          }
+        const hm: Record<number, number> = {};
+        for (const [sid, counts] of Object.entries(acc)) {
+          const c = counts as { occupied: number; total: number };
+          hm[Number(sid)] = c.total > 0 ? c.occupied / c.total : 0;
         }
+        setHeatmapData(hm);
 
-        // Update activity feed from within the updater so events are captured synchronously
-        if (newEvents.length > 0) {
-          setActivityFeed((prevFeed) => [...newEvents, ...prevFeed].slice(0, 30));
-        }
-
-        return {
-          ...prev,
-          grid: newGrid,
-          sensors: newSensors,
-          lastSync: new Date().toISOString(),
-        };
-      });
-
-      // Update heatmap data from accumulator
-      const acc = heatmapAccRef.current;
-      const hm: Record<number, number> = {};
-      for (const [sid, counts] of Object.entries(acc)) {
-        hm[Number(sid)] = counts.total > 0 ? counts.occupied / counts.total : 0;
-      }
-      setHeatmapData(hm);
-
-      // Generate dynamic alerts from sensor states
-      setData((currentData) => {
-        const newAlerts: Alert[] = [];
+        // Generate alerts from sensor states
         const keys = generatedAlertKeysRef.current;
         const now = new Date().toISOString();
+        const newAlerts: Alert[] = [];
 
-        for (const sensor of Object.values(currentData.sensors)) {
-          // Offline sensor alert
-          if (!sensor.sensorOnline) {
-            const key = `sensor_offline_${sensor.spotId}`;
+        for (const sensor of Object.values(state.sensors)) {
+          const s = sensor as { spotId: number; sensorOnline: boolean; batteryPercent: number | null };
+          if (!s.sensorOnline) {
+            const key = `sensor_offline_${s.spotId}`;
             if (!keys.has(key)) {
               keys.add(key);
               newAlerts.push({
-                id: key,
-                timestamp: now,
-                severity: "warning",
-                message: `Sensor at Spot ${sensor.spotId} is offline — not responding`,
-                spotId: sensor.spotId,
-                type: "sensor_offline",
+                id: key, timestamp: now, severity: "warning",
+                message: `Sensor at Spot ${s.spotId} is offline — not responding`,
+                spotId: s.spotId, type: "sensor_offline",
               });
             }
           }
-          // Low battery alert
-          if (sensor.batteryPercent !== null && sensor.batteryPercent < 20) {
-            const key = `battery_low_${sensor.spotId}`;
+          if (s.batteryPercent !== null && s.batteryPercent < 20) {
+            const key = `battery_low_${s.spotId}`;
             if (!keys.has(key)) {
               keys.add(key);
               newAlerts.push({
-                id: key,
-                timestamp: now,
-                severity: "warning",
-                message: `Spot ${sensor.spotId} battery at ${sensor.batteryPercent}% — replace soon`,
-                spotId: sensor.spotId,
-                type: "battery_low",
+                id: key, timestamp: now, severity: "warning",
+                message: `Spot ${s.spotId} battery at ${s.batteryPercent}% — replace soon`,
+                spotId: s.spotId, type: "battery_low",
               });
             }
           }
         }
 
-        // High occupancy alert
-        const statsNow = computeStats(currentData);
+        const statsNow = computeStats({ grid: state.grid, sensors: state.sensors, lastSync: state.lastSync, piZeroStatus: state.piZeroStatus, backendStatus: state.backendStatus });
         const occPct = Math.round((statsNow.occupied / statsNow.totalSpots) * 100);
         if (occPct > 85) {
           const key = `occupancy_high`;
           if (!keys.has(key)) {
             keys.add(key);
-            newAlerts.push({
-              id: key,
-              timestamp: now,
-              severity: "critical",
-              message: `Lot at ${occPct}% capacity — nearing full`,
-              type: "occupancy_threshold",
-            });
+            newAlerts.push({ id: key, timestamp: now, severity: "critical", message: `Lot at ${occPct}% capacity — nearing full`, type: "occupancy_threshold" });
           }
         } else {
-          // Reset so it can fire again if occupancy drops and rises
-          generatedAlertKeysRef.current.delete("occupancy_high");
+          keys.delete("occupancy_high");
         }
 
         if (newAlerts.length > 0) {
           setAlerts((prev) => [...newAlerts, ...prev].slice(0, 100));
         }
-
-        return currentData; // no change to data
-      });
-
-      setTickCount((t) => t + 1);
-    }, 3500);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Poll real sensor data every 3 seconds for all real spots
-  useEffect(() => {
-    const fetchRealSpots = async () => {
-      for (const config of REAL_SPOTS) {
-        try {
-          const res = await fetch(`/api/parking/spot/${config.spotNumber}`);
-          if (!res.ok) continue;
-          const sensor = await res.json();
-          setData((prev) => {
-            const newGrid = prev.grid.map((row) => row.map((s) => ({ ...s })));
-            newGrid[config.row][config.col] = {
-              status: sensor.objectDetected ? SpotStatus.Occupied : SpotStatus.Available,
-              isHandicap: false,
-            };
-            const newSensors = { ...prev.sensors, [config.spotNumber]: sensor };
-            return { ...prev, grid: newGrid, sensors: newSensors };
-          });
-        } catch {
-          // Will retry next interval
-        }
+      } catch {
+        // Will retry next interval
       }
     };
 
-    fetchRealSpots();
-    const interval = setInterval(fetchRealSpots, 3000);
+    fetchState();
+    const interval = setInterval(fetchState, 3000);
     return () => clearInterval(interval);
   }, []);
 

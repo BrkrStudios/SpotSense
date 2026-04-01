@@ -54,12 +54,27 @@ class AppSettings: ObservableObject {
 @main
 struct SpotSenseApp: App {
     @StateObject private var appSettings = AppSettings()
+    @StateObject private var parkingLot = ParkingLotViewModel()
+    @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var notificationManager = NotificationManager()
 
     var body: some Scene {
         WindowGroup {
             MainTabView()
                 .environmentObject(appSettings)
+                .environmentObject(parkingLot)
+                .environmentObject(favoritesManager)
+                .environmentObject(notificationManager)
                 .preferredColorScheme(appSettings.theme.colorScheme)
+                .onAppear {
+                    // Wire manager references into the ViewModel
+                    parkingLot.notificationManager = notificationManager
+                    parkingLot.favoritesManager = favoritesManager
+
+                    // Request notification permission on launch
+                    notificationManager.requestPermission()
+                    notificationManager.checkAuthorizationStatus()
+                }
         }
     }
 }

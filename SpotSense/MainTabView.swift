@@ -10,9 +10,19 @@ import SwiftUI
 struct MainTabView: View {
     var body: some View {
         TabView {
+            DashboardView()
+                .tabItem {
+                    Label("Dashboard", systemImage: "chart.bar.fill")
+                }
+
             ParkingLotSelectionView()
                 .tabItem {
-                    Label("Parking", systemImage: "car.fill")
+                    Label("Map", systemImage: "map.fill")
+                }
+
+            FavoritesView()
+                .tabItem {
+                    Label("Favorites", systemImage: "heart.fill")
                 }
 
             SettingsView()
@@ -26,4 +36,7 @@ struct MainTabView: View {
 #Preview {
     MainTabView()
         .environmentObject(AppSettings())
+        .environmentObject(ParkingLotViewModel())
+        .environmentObject(FavoritesManager())
+        .environmentObject(NotificationManager())
 }

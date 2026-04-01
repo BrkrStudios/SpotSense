@@ -1,11 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
-import { getMockParkingData } from "@/lib/mock-data";
 import { positionForSpotNumber, spotColor, relativeTime } from "@/lib/utils";
-import { SpotStatus } from "@/lib/types";
+import { SpotStatus, SensorReading } from "@/lib/types";
+import { isRealSpot, getRealSpotByNumber } from "@/lib/sensor-config";
+import { useParkingData } from "@/context/ParkingDataContext";
 
 export default function SensorDetailPage({
   params,
@@ -14,11 +15,37 @@ export default function SensorDetailPage({
 }) {
   const { spotId: spotIdStr } = use(params);
   const spotId = Number(spotIdStr);
-  const data = getMockParkingData();
+  const { data } = useParkingData();
   const sensor = data.sensors[spotId];
   const pos = positionForSpotNumber(spotId);
 
-  if (!sensor || !pos) {
+  // For real spots, poll the API to get live data including camera snapshot
+  const [liveSensor, setLiveSensor] = useState<SensorReading | null>(null);
+  const realSpotConfig = getRealSpotByNumber(spotId);
+
+  const fetchLiveData = useCallback(async () => {
+    if (!isRealSpot(spotId)) return;
+    try {
+      const res = await fetch(`/api/parking/spot/${spotId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLiveSensor(data);
+      }
+    } catch { /* retry next interval */ }
+  }, [spotId]);
+
+  useEffect(() => {
+    fetchLiveData();
+    if (isRealSpot(spotId)) {
+      const interval = setInterval(fetchLiveData, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [spotId, fetchLiveData]);
+
+  // Use live sensor data for real spots, fall back to context data
+  const displaySensor = liveSensor ?? sensor;
+
+  if (!displaySensor || !pos) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header title="Sensor Detail" />
@@ -71,7 +98,7 @@ export default function SensorDetailPage({
             <Card title="TOF Distance Reading">
               <div className="flex items-baseline gap-2 mb-3">
                 <span className="text-4xl font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
-                  {sensor.distanceMm}
+                  {displaySensor.distanceMm}
                 </span>
                 <span className="text-lg" style={{ color: "var(--text-secondary)" }}>mm</span>
               </div>
@@ -79,8 +106,8 @@ export default function SensorDetailPage({
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
-                    width: `${Math.min(100, (sensor.distanceMm / 2000) * 100)}%`,
-                    backgroundColor: sensor.objectDetected ? "#D92626" : "#33BF4D",
+                    width: `${Math.min(100, (displaySensor.distanceMm / 2000) * 100)}%`,
+                    backgroundColor: displaySensor.objectDetected ? "#D92626" : "#33BF4D",
                   }}
                 />
               </div>
@@ -95,14 +122,14 @@ export default function SensorDetailPage({
               <div className="flex items-center gap-3">
                 <div
                   className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: sensor.objectDetected ? "#D92626" : "#33BF4D" }}
+                  style={{ backgroundColor: displaySensor.objectDetected ? "#D92626" : "#33BF4D" }}
                 />
                 <span className="text-base" style={{ color: "var(--text-primary)" }}>
-                  {sensor.objectDetected ? "Object Detected" : "No Object"}
+                  {displaySensor.objectDetected ? "Object Detected" : "No Object"}
                 </span>
               </div>
               <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>
-                Consecutive detections: <strong style={{ color: "var(--text-primary)" }}>{sensor.consecutiveDetections}</strong>
+                Consecutive detections: <strong style={{ color: "var(--text-primary)" }}>{displaySensor.consecutiveDetections}</strong>
               </p>
             </Card>
           </div>
@@ -117,34 +144,34 @@ export default function SensorDetailPage({
                   <div className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: sensor.sensorOnline ? "#33BF4D" : "#E67E22" }}
+                      style={{ backgroundColor: displaySensor.sensorOnline ? "#33BF4D" : "#E67E22" }}
                     />
-                    <span className="text-sm font-medium" style={{ color: sensor.sensorOnline ? "var(--text-primary)" : "#E67E22" }}>
-                      {sensor.sensorOnline ? "Online" : "Offline"}
+                    <span className="text-sm font-medium" style={{ color: displaySensor.sensorOnline ? "var(--text-primary)" : "#E67E22" }}>
+                      {displaySensor.sensorOnline ? "Online" : "Offline"}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Last Updated</span>
-                  <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                    {relativeTime(sensor.lastUpdated)}
+                  <span className="text-sm" style={{ color: "var(--text-primary)" }} suppressHydrationWarning>
+                    {relativeTime(displaySensor.lastUpdated)}
                   </span>
                 </div>
-                {sensor.batteryPercent !== null && (
+                {displaySensor.batteryPercent !== null && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Battery</span>
                       <span className="text-sm font-medium tabular-nums" style={{ color: "var(--text-primary)" }}>
-                        {sensor.batteryPercent}%
+                        {displaySensor.batteryPercent}%
                       </span>
                     </div>
                     <div className="w-full h-2 rounded-full" style={{ backgroundColor: "var(--surface)" }}>
                       <div
                         className="h-full rounded-full"
                         style={{
-                          width: `${sensor.batteryPercent}%`,
+                          width: `${displaySensor.batteryPercent}%`,
                           backgroundColor:
-                            sensor.batteryPercent > 50 ? "#33BF4D" : sensor.batteryPercent > 20 ? "#F59E0B" : "#D92626",
+                            displaySensor.batteryPercent > 50 ? "#33BF4D" : displaySensor.batteryPercent > 20 ? "#F59E0B" : "#D92626",
                         }}
                       />
                     </div>
@@ -155,23 +182,37 @@ export default function SensorDetailPage({
 
             {/* Camera */}
             <Card title="Camera Snapshot">
-              <div
-                className="w-full aspect-video rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: "var(--surface)" }}
-              >
-                <div className="text-center">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" className="mx-auto mb-2">
-                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                    No snapshot available
-                  </p>
-                  <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
-                    ArduCamera activates after {3} consecutive TOF detections
+              {displaySensor.cameraSnapshotUrl ? (
+                <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
+                  <img
+                    src={displaySensor.cameraSnapshotUrl}
+                    alt={`Spot ${spotId} camera snapshot`}
+                    className="w-full h-auto rounded-lg"
+                    style={{ maxHeight: "300px", objectFit: "cover", transform: realSpotConfig?.firebaseSpotId === "A12" ? "rotate(180deg)" : undefined }}
+                  />
+                  <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
+                    Live from {realSpotConfig?.deviceId ?? "sensor"} · Updated {relativeTime(displaySensor.lastUpdated)}
                   </p>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="w-full aspect-video rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: "var(--surface)" }}
+                >
+                  <div className="text-center">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" className="mx-auto mb-2">
+                      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      No snapshot available
+                    </p>
+                    <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
+                      ArduCamera activates after 3 consecutive TOF detections
+                    </p>
+                  </div>
+                </div>
+              )}
             </Card>
 
             {/* Position */}

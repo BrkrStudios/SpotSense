@@ -10,12 +10,12 @@ import SwiftUI
 struct SettingsView: View {
     @State private var showPrivacyPolicy = false
     @EnvironmentObject var appSettings: AppSettings
+    @EnvironmentObject var notificationManager: NotificationManager
 
     var body: some View {
         NavigationStack {
             List {
                 Section("General") {
-                    Label("Notifications", systemImage: "bell")
                     Picker(selection: $appSettings.theme) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
                             Text(theme.rawValue).tag(theme)
@@ -23,6 +23,59 @@ struct SettingsView: View {
                     } label: {
                         Label("Appearance", systemImage: "paintbrush")
                     }
+                }
+
+                // MARK: - Notifications
+                Section {
+                    Toggle(isOn: $notificationManager.favoriteSpotAlerts) {
+                        Label("Favorite Spot Opens", systemImage: "heart.fill")
+                    }
+
+                    Toggle(isOn: $notificationManager.nearbySpotAlerts) {
+                        Label("Nearby Spot Opens", systemImage: "location.fill")
+                    }
+
+                    Toggle(isOn: $notificationManager.highOccupancyAlerts) {
+                        Label("Lot Nearly Full", systemImage: "exclamationmark.triangle.fill")
+                    }
+
+                    if notificationManager.highOccupancyAlerts {
+                        Stepper(
+                            "Threshold: \(notificationManager.highThreshold)%",
+                            value: $notificationManager.highThreshold,
+                            in: 70...100,
+                            step: 5
+                        )
+                        .padding(.leading, 28)
+                    }
+
+                    Toggle(isOn: $notificationManager.lowOccupancyAlerts) {
+                        Label("Lot Has Space", systemImage: "checkmark.circle.fill")
+                    }
+
+                    if notificationManager.lowOccupancyAlerts {
+                        Stepper(
+                            "Threshold: \(notificationManager.lowThreshold)%",
+                            value: $notificationManager.lowThreshold,
+                            in: 10...70,
+                            step: 5
+                        )
+                        .padding(.leading, 28)
+                    }
+
+                    if !notificationManager.isAuthorized {
+                        HStack {
+                            Image(systemName: "bell.slash")
+                                .foregroundColor(.orange)
+                            Text("Notifications are disabled in System Settings")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Notifications")
+                } footer: {
+                    Text("Notifications are active while SpotSense is running.")
                 }
 
                 Section("Parking") {
@@ -37,7 +90,7 @@ struct SettingsView: View {
                     HStack {
                         Label("Version", systemImage: "info.circle")
                         Spacer()
-                        Text("1.5.0")
+                        Text("2.0.0")
                             .foregroundColor(.secondary)
                     }
                     Button {
@@ -117,4 +170,5 @@ struct PrivacyPolicyView: View {
 #Preview {
     SettingsView()
         .environmentObject(AppSettings())
+        .environmentObject(NotificationManager())
 }

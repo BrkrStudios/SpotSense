@@ -2,6 +2,7 @@
 
 import { SensorReading, ParkingSpot, SpotStatus } from "@/lib/types";
 import { spotColor, relativeTime } from "@/lib/utils";
+import { getRealSpotByNumber } from "@/lib/sensor-config";
 
 interface SpotDetailPanelProps {
   spotId: number;
@@ -175,17 +176,31 @@ export default function SpotDetailPanel({
 
           {/* Camera Snapshot */}
           <Section title="Camera Snapshot">
-            <div
-              className="w-full aspect-video rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: "var(--surface)" }}
-            >
-              <span
-                className="text-xs"
-                style={{ color: "var(--text-secondary)" }}
+            {sensor.cameraSnapshotUrl ? (
+              <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
+                <img
+                  src={sensor.cameraSnapshotUrl}
+                  alt={`Spot ${spotId} camera snapshot`}
+                  className="w-full h-auto rounded-lg"
+                  style={{ maxHeight: "240px", objectFit: "cover", transform: getRealSpotByNumber(spotId)?.firebaseSpotId === "A12" ? "rotate(180deg)" : undefined }}
+                />
+                <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
+                  Live from {getRealSpotByNumber(spotId)?.deviceId ?? "sensor"} · Updated {relativeTime(sensor.lastUpdated)}
+                </p>
+              </div>
+            ) : (
+              <div
+                className="w-full aspect-video rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: "var(--surface)" }}
               >
-                No snapshot available
-              </span>
-            </div>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  No snapshot available
+                </span>
+              </div>
+            )}
           </Section>
 
           {/* Battery */}

@@ -86,11 +86,24 @@ function buildGrid(): ParkingSpot[][] {
   }
 
   // Occupy spots based on realistic day-of-week / time-of-day profile
+  // Bias: top-left spots fill first (closest to building entrance)
   const fillRate = getRealisticFillRate();
-  for (const row of PARKING_ROW_INDICES) {
+  const totalParkingRows = PARKING_ROW_INDICES.length;
+  for (let ri = 0; ri < totalParkingRows; ri++) {
+    const row = PARKING_ROW_INDICES[ri];
     for (let col = 0; col < SPOTS_PER_ROW; col++) {
       if (grid[row][col].status === SpotStatus.NotASpot) continue;
-      if (rand() < fillRate) {
+
+      // Proximity bias: top-left is most desirable, bottom-right least
+      const rowFactor = ri / (totalParkingRows - 1);
+      const colFactor = col / (SPOTS_PER_ROW - 1);
+      // Combined distance from "entrance" (top-left), row weighted slightly more
+      const distance = rowFactor * 0.6 + colFactor * 0.4;
+      // Boost probability for close spots, reduce for far ones
+      const spotProb = fillRate * (1 + (1 - distance) * 1.4 - distance * 0.7);
+      const clampedProb = Math.max(0, Math.min(1, spotProb));
+
+      if (rand() < clampedProb) {
         grid[row][col] = {
           status: SpotStatus.Occupied,
           isHandicap: grid[row][col].isHandicap,

@@ -1,0 +1,240 @@
+/**
+ * Server-side parking lot simulation singleton.
+ * Runs the same simulation logic that was previously in ParkingDataContext (browser),
+ * but on the Node.js server so both admin portal and iOS app see identical state.
+ *
+ * Uses globalThis to survive Next.js HMR in dev mode.
+ */
+
+import {
+  ParkingSpot,
+  ParkingLotData,
+  SensorReading,
+  SpotStatus,
+  ActivityEvent,
+} from "./types";
+import {
+  PARKING_ROW_INDICES,
+  SPOTS_PER_ROW,
+  TOTAL_NUMBERED_SPOTS,
+  NOT_A_SPOT_POSITIONS,
+  GRASS_POSITIONS,
+} from "./constants";
+import { getMockParkingData } from "./mock-data";
+import { DAY_PROFILES, interpolateProfile } from "./occupancy-profiles";
+import { isRealSpotPosition } from "./sensor-config";
+import { spotNumberForPosition } from "./utils";
+import { getRealSpotsData, REAL_SPOTS } from "./sensor";
+
+interface SimulationState {
+  data: ParkingLotData;
+  activityFeed: ActivityEvent[];
+  tickCount: number;
+  eventCounter: number;
+  simInterval: ReturnType<typeof setInterval> | null;
+  realSpotInterval: ReturnType<typeof setInterval> | null;
+}
+
+const GLOBAL_KEY = "__parkingSimulation" as const;
+
+function getOrCreateSimulation(): SimulationState {
+  const g = globalThis as unknown as Record<string, SimulationState | undefined>;
+  if (g[GLOBAL_KEY]) return g[GLOBAL_KEY]!;
+
+  const mockData = getMockParkingData();
+  const state: SimulationState = {
+    data: {
+      grid: mockData.grid.map((row) => row.map((spot) => ({ ...spot }))),
+      sensors: { ...mockData.sensors },
+      lastSync: new Date().toISOString(),
+      piZeroStatus: "online",
+      backendStatus: "online",
+    },
+    activityFeed: [],
+    tickCount: 0,
+    eventCounter: 0,
+    simInterval: null,
+    realSpotInterval: null,
+  };
+
+  g[GLOBAL_KEY] = state;
+  startSimulation(state);
+  return state;
+}
+
+function startSimulation(state: SimulationState): void {
+  if (state.simInterval) return; // already running
+
+  const usableSpots =
+    TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length;
+  const totalPRows = PARKING_ROW_INDICES.length;
+
+  // --- Main simulation tick (every 3.5s) ---
+  state.simInterval = setInterval(() => {
+    const newGrid = state.data.grid.map((row) => row.map((spot) => ({ ...spot })));
+    const newSensors = { ...state.data.sensors };
+    const newEvents: ActivityEvent[] = [];
+
+    // Day profile targeting
+    const now = new Date();
+    const hour = now.getHours() + now.getMinutes() / 60;
+    const dayOfWeek = now.getDay();
+    const profile = DAY_PROFILES[dayOfWeek];
+    const targetFraction = interpolateProfile(profile, hour);
+    const targetOccupied = Math.round(targetFraction * usableSpots);
+
+    // Count current occupied
+    let currentOccupied = 0;
+    for (const rowIdx of PARKING_ROW_INDICES) {
+      for (let col = 0; col < SPOTS_PER_ROW; col++) {
+        if (newGrid[rowIdx][col].status === SpotStatus.Occupied) currentOccupied++;
+      }
+    }
+
+    // Bias direction
+    const needMore = currentOccupied < targetOccupied;
+    const diff = Math.abs(currentOccupied - targetOccupied);
+    const numChanges =
+      diff > 20
+        ? 3 + Math.floor(Math.random() * 3)
+        : 1 + Math.floor(Math.random() * 3);
+
+    // Weighted random pick: front-left spots are more desirable
+    const pickWeightedSpot = (preferFront: boolean) => {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        let ri: number, ci: number;
+        if (preferFront) {
+          ri = Math.floor(Math.pow(Math.random(), 1.6) * totalPRows);
+          ci = Math.floor(Math.pow(Math.random(), 1.4) * SPOTS_PER_ROW);
+        } else {
+          ri = Math.floor((1 - Math.pow(Math.random(), 1.6)) * totalPRows);
+          ci = Math.floor((1 - Math.pow(Math.random(), 1.4)) * SPOTS_PER_ROW);
+        }
+        ri = Math.min(ri, totalPRows - 1);
+        ci = Math.min(ci, SPOTS_PER_ROW - 1);
+        return { rowIdx: PARKING_ROW_INDICES[ri], col: ci };
+      }
+      return {
+        rowIdx: PARKING_ROW_INDICES[Math.floor(Math.random() * totalPRows)],
+        col: Math.floor(Math.random() * SPOTS_PER_ROW),
+      };
+    };
+
+    // Toggle spots
+    for (let i = 0; i < numChanges; i++) {
+      const { rowIdx, col } = pickWeightedSpot(needMore);
+      if (isRealSpotPosition(rowIdx, col)) continue;
+
+      const spotId = spotNumberForPosition(rowIdx, col);
+      if (spotId && newSensors[spotId] && !newSensors[spotId].sensorOnline) continue;
+
+      const spot = newGrid[rowIdx][col];
+      if (spot.status === SpotStatus.NotASpot) continue;
+      const oldStatus = spot.status;
+
+      if (spot.status === SpotStatus.Occupied && (!needMore || Math.random() < 0.2)) {
+        newGrid[rowIdx][col] = {
+          status: spot.isHandicap ? SpotStatus.Handicap : SpotStatus.Available,
+          isHandicap: spot.isHandicap,
+        };
+      } else if (
+        (spot.status === SpotStatus.Available || spot.status === SpotStatus.Handicap) &&
+        (needMore || Math.random() < 0.2)
+      ) {
+        newGrid[rowIdx][col] = {
+          status: SpotStatus.Occupied,
+          isHandicap: spot.isHandicap,
+        };
+      }
+
+      // Activity event
+      if (spotId && newGrid[rowIdx][col].status !== oldStatus) {
+        state.eventCounter++;
+        newEvents.push({
+          id: `${Date.now()}-${spotId}-${state.eventCounter}`,
+          timestamp: new Date().toISOString(),
+          spotId,
+          oldStatus,
+          newStatus: newGrid[rowIdx][col].status,
+          isHandicap: newGrid[rowIdx][col].isHandicap,
+        });
+      }
+    }
+
+    // Sync sensor readings for simulated spots
+    for (const rowIdx of PARKING_ROW_INDICES) {
+      for (let col = 0; col < SPOTS_PER_ROW; col++) {
+        if (isRealSpotPosition(rowIdx, col)) continue;
+        const sid = spotNumberForPosition(rowIdx, col);
+        if (!sid || !newSensors[sid]) continue;
+        if (!newSensors[sid].sensorOnline) continue;
+        const isOccupied = newGrid[rowIdx][col].status === SpotStatus.Occupied;
+        newSensors[sid] = {
+          ...newSensors[sid],
+          distanceMm: isOccupied
+            ? Math.floor(50 + Math.random() * 350)
+            : Math.floor(1200 + Math.random() * 800),
+          objectDetected: isOccupied,
+          consecutiveDetections: isOccupied ? Math.floor(3 + Math.random() * 7) : 0,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    }
+
+    // Commit state
+    state.data.grid = newGrid;
+    state.data.sensors = newSensors;
+    state.data.lastSync = new Date().toISOString();
+    state.activityFeed = [...newEvents, ...state.activityFeed].slice(0, 30);
+    state.tickCount++;
+  }, 3500);
+
+  // --- Real spot polling (every 3s) ---
+  const fetchRealSpots = async () => {
+    try {
+      const realDataMap = await getRealSpotsData();
+      for (const config of REAL_SPOTS) {
+        const realData = realDataMap[config.spotNumber];
+        if (realData) {
+          state.data.grid[config.row][config.col] = {
+            status: realData.status,
+            isHandicap: false,
+          };
+          state.data.sensors[config.spotNumber] = realData.sensor;
+        }
+      }
+
+      const onlineCount = Object.keys(realDataMap).length;
+      state.data.piZeroStatus =
+        onlineCount === REAL_SPOTS.length
+          ? "online"
+          : onlineCount > 0
+            ? "degraded"
+            : "offline";
+      if (onlineCount > 0) {
+        state.data.lastSync = new Date().toISOString();
+      }
+    } catch {
+      // Will retry next interval
+    }
+  };
+
+  fetchRealSpots();
+  state.realSpotInterval = setInterval(fetchRealSpots, 3000);
+}
+
+/**
+ * Get the current simulation state. Auto-starts the simulation on first call.
+ */
+export function getSimulationState() {
+  const state = getOrCreateSimulation();
+  return {
+    grid: state.data.grid,
+    sensors: state.data.sensors,
+    lastSync: state.data.lastSync,
+    piZeroStatus: state.data.piZeroStatus,
+    backendStatus: state.data.backendStatus,
+    activityFeed: state.activityFeed,
+    tickCount: state.tickCount,
+  };
+}

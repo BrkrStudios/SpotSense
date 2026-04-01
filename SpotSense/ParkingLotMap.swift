@@ -13,6 +13,7 @@ enum SpotStatus: Int, Codable {
 struct ParkingSpot: Codable {
     var status: SpotStatus
     var isHandicap: Bool
+    var sensorData: ParkingAPISensorData?
 
     var isOccupied: Bool {
         return status == .occupied
@@ -20,6 +21,41 @@ struct ParkingSpot: Codable {
 
     var isAvailable: Bool {
         return status == .available || (status == .handicap && !isOccupied)
+    }
+
+    var hasSensor: Bool {
+        return sensorData != nil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status, isHandicap
+    }
+}
+
+// MARK: - Lot Sections (for "nearby" notifications)
+enum LotSection: String, CaseIterable {
+    case a = "A (Front)"
+    case b = "B"
+    case c = "C"
+    case d = "D"
+    case e = "E"
+    case f = "F"
+    case g = "G (Back)"
+
+    var spotRange: ClosedRange<Int> {
+        switch self {
+        case .a: return 1...66     // rows 1, 3, 4
+        case .b: return 67...110   // rows 6, 7
+        case .c: return 111...154  // rows 9, 10
+        case .d: return 155...198  // rows 12, 13
+        case .e: return 199...242  // rows 15, 16
+        case .f: return 243...286  // rows 18, 19
+        case .g: return 287...308  // row 21
+        }
+    }
+
+    static func section(forSpotNumber spot: Int) -> LotSection? {
+        return allCases.first { $0.spotRange.contains(spot) }
     }
 }
 

@@ -58,7 +58,7 @@ export async function getRealSpotsData(): Promise<
   const result: Record<number, { status: SpotStatus; sensor: SensorReading }> = {};
   const firebaseSpotIds = REAL_SPOTS.map((s) => s.firebaseSpotId);
 
-  let readings: Record<string, { occupied: boolean; distanceMm: number; timestamp: string }>;
+  let readings: Record<string, { occupied: boolean; distanceMm: number; timestamp: string; imagePath?: string; deviceId?: string }>;
 
   try {
     const firebaseData = await fetchLatestReadings(firebaseSpotIds);
@@ -68,6 +68,8 @@ export async function getRealSpotsData(): Promise<
         occupied: data.occupied,
         distanceMm: data.distanceMm,
         timestamp: data.timestamp,
+        imagePath: data.imagePath || undefined,
+        deviceId: data.deviceId || undefined,
       };
     }
   } catch (err) {
@@ -92,6 +94,13 @@ export async function getRealSpotsData(): Promise<
     if (!reading) continue;
 
     const isOccupied = reading.occupied;
+
+    // Only use the image if it came from the correct Pi for this spot
+    let snapshotUrl: string | null = null;
+    if (reading.imagePath && reading.deviceId === config.deviceId) {
+      snapshotUrl = reading.imagePath;
+    }
+
     result[config.spotNumber] = {
       status: isOccupied ? SpotStatus.Occupied : SpotStatus.Available,
       sensor: {
@@ -100,7 +109,7 @@ export async function getRealSpotsData(): Promise<
         col: config.col,
         distanceMm: reading.distanceMm ?? 0,
         objectDetected: isOccupied,
-        cameraSnapshotUrl: null,
+        cameraSnapshotUrl: snapshotUrl,
         lastUpdated: reading.timestamp,
         batteryPercent: null,
         sensorOnline: true,

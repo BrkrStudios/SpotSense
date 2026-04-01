@@ -33,11 +33,42 @@ enum LaneType {
     case lane, road, grass
 }
 
+// MARK: - Occupancy Trend
+
+enum OccupancyTrend {
+    case rising, falling, steady
+
+    var icon: String {
+        switch self {
+        case .rising: return "arrow.up.right"
+        case .falling: return "arrow.down.right"
+        case .steady: return "arrow.right"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .rising: return .red
+        case .falling: return .green
+        case .steady: return .secondary
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .rising: return "Occupancy is increasing"
+        case .falling: return "Occupancy is decreasing"
+        case .steady: return "Occupancy is steady"
+        }
+    }
+}
+
 // MARK: - Parking Lot Detail View
 
 struct ParkingLotDetailView: View {
     @EnvironmentObject var appSettings: AppSettings
-    @StateObject private var parkingLot = ParkingLotViewModel()
+    @EnvironmentObject var parkingLot: ParkingLotViewModel
+    @EnvironmentObject var favoritesManager: FavoritesManager
     @State private var isSearching: Bool = false
     @State private var searchText: String = ""
     @State private var currentScale: CGFloat = 1.0
@@ -48,6 +79,7 @@ struct ParkingLotDetailView: View {
     @State private var lastRotation: Angle = .zero
     @State private var pinchCenter: CGPoint? = nil
     @State private var isPinching: Bool = false
+    @State private var selectedSpotNumber: Int? = nil
 
     var body: some View {
         ZStack {
@@ -82,6 +114,29 @@ struct ParkingLotDetailView: View {
                 resetView()
                 appSettings.shouldResetParkingData = false
             }
+        }
+        .sheet(item: Binding<SpotSelection?>(
+            get: {
+                if let num = selectedSpotNumber,
+                   let pos = ParkingLotMap.position(forSpotNumber: num) {
+                    return SpotSelection(
+                        spotNumber: num,
+                        spot: parkingLot.map.map[pos.row][pos.col]
+                    )
+                }
+                return nil
+            },
+            set: { selection in
+                selectedSpotNumber = selection?.spotNumber
+            }
+        )) { selection in
+            SpotDetailSheet(
+                spotNumber: selection.spotNumber,
+                spot: selection.spot
+            )
+            .environmentObject(favoritesManager)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.hidden)
         }
     }
 
@@ -141,7 +196,9 @@ struct ParkingLotDetailView: View {
         GeometryReader { geo in
             let viewCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
 
-            ParkingLotView(parkingLot: parkingLot)
+            ParkingLotView(parkingLot: parkingLot, favoritesManager: favoritesManager, onSpotTap: { spotNum in
+                selectedSpotNumber = spotNum
+            })
                 .rotationEffect(currentRotation)
                 .scaleEffect(currentScale, anchor: .center)
                 .offset(currentOffset)
@@ -279,10 +336,20 @@ struct ParkingLotDetailView: View {
     }
 }
 
+// MARK: - Spot Selection (for sheet binding)
+
+struct SpotSelection: Identifiable {
+    let spotNumber: Int
+    let spot: ParkingSpot
+    var id: Int { spotNumber }
+}
+
 // MARK: - Parking Grid View
 
 struct ParkingLotView: View {
     @ObservedObject var parkingLot: ParkingLotViewModel
+    @ObservedObject var favoritesManager: FavoritesManager
+    var onSpotTap: (Int) -> Void
 
     // Lane types for each driving lane row index
     static let laneTypes: [Int: LaneType] = [
@@ -340,16 +407,20 @@ struct ParkingLotView: View {
                     // Top row
                     ParkingRowView(
                         parkingLot: parkingLot,
+                        favoritesManager: favoritesManager,
                         rowIndex: aisle.top,
-                        facingUp: true
+                        facingUp: true,
+                        onSpotTap: onSpotTap
                     )
 
                     // Bottom row
                     if let bottom = aisle.bottom {
                         ParkingRowView(
                             parkingLot: parkingLot,
+                            favoritesManager: favoritesManager,
                             rowIndex: bottom,
-                            facingUp: false
+                            facingUp: false,
+                            onSpotTap: onSpotTap
                         )
                     }
 
@@ -374,25 +445,29 @@ struct ParkingLotView: View {
 
 struct ParkingRowView: View {
     @ObservedObject var parkingLot: ParkingLotViewModel
+    @ObservedObject var favoritesManager: FavoritesManager
     let rowIndex: Int
     let facingUp: Bool
+    var onSpotTap: (Int) -> Void
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(0..<ParkingLotMap.spotsPerRow, id: \.self) { col in
                 let spotNum = ParkingLotMap.spotNumber(forRow: rowIndex, col: col) ?? 0
                 let isGrass = ParkingLotView.isGrassPosition(row: rowIndex, col: col)
+                let isFav = favoritesManager.isFavorite(spotNum)
                 ParkingSpotView(
                     spot: parkingLot.map.map[rowIndex][col],
                     row: rowIndex,
                     col: col,
                     facingUp: facingUp,
                     spotNumber: spotNum,
-                    isGrass: isGrass
+                    isGrass: isGrass,
+                    isFavorite: isFav
                 )
                 .onTapGesture {
-                    if !isGrass {
-                        parkingLot.toggleSpot(row: rowIndex, col: col)
+                    if !isGrass && parkingLot.map.map[rowIndex][col].status != .notASpot {
+                        onSpotTap(spotNum)
                     }
                 }
             }
@@ -409,6 +484,7 @@ struct ParkingSpotView: View {
     let facingUp: Bool
     let spotNumber: Int
     let isGrass: Bool
+    var isFavorite: Bool = false
 
     var isUnusable: Bool {
         spot.status == .notASpot && !isGrass
@@ -458,6 +534,34 @@ struct ParkingSpotView: View {
                         Image(systemName: "figure.roll")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
+                    }
+
+                    // Favorite heart overlay
+                    if isFavorite {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 6))
+                                    .foregroundColor(.pink)
+                            }
+                            Spacer()
+                        }
+                        .padding(4)
+                    }
+
+                    // Live sensor indicator
+                    if spot.hasSensor {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                    .font(.system(size: 5))
+                                    .foregroundColor(.orange)
+                                Spacer()
+                            }
+                        }
+                        .padding(4)
                     }
 
                     // Spot number label
@@ -621,9 +725,20 @@ struct StatCircle: View {
 class ParkingLotViewModel: ObservableObject {
     @Published var map: ParkingLotMap
     @Published var isConnected: Bool = false
+    @Published var lastSync: Date? = nil
 
     private let apiService = ParkingAPIService()
     private var pollTimer: Timer?
+
+    // Occupancy history for trend calculation
+    private var occupancySnapshots: [(date: Date, percent: Int)] = []
+
+    // Previous map state for notification diffing
+    var previousMap: ParkingLotMap? = nil
+
+    // Notification manager reference (set by SpotSenseApp)
+    var notificationManager: NotificationManager?
+    var favoritesManager: FavoritesManager?
 
     init() {
         self.map = ParkingLotMap()
@@ -646,22 +761,30 @@ class ParkingLotViewModel: ObservableObject {
         map.availableHandicapSpotCount()
     }
 
-    func toggleSpot(row: Int, col: Int) {
-        guard map.isValidPosition(row: row, col: col) else { return }
-        guard map.map[row][col].status != .notASpot else { return }
+    var occupancyPercent: Int {
+        let total = map.totalSpotCount()
+        guard total > 0 else { return 0 }
+        return Int(round(Double(map.occupiedSpotCount()) / Double(total) * 100))
+    }
 
-        if map.map[row][col].status == .occupied {
-            _ = map.removeCar(row: row, col: col)
-        } else {
-            _ = map.parkCar(row: row, col: col)
+    var occupancyTrend: OccupancyTrend {
+        guard occupancySnapshots.count >= 2 else { return .steady }
+        let fiveMinAgo = Date().addingTimeInterval(-300)
+        let recent = occupancySnapshots.last?.percent ?? 0
+
+        // Find snapshot closest to 5 min ago
+        if let older = occupancySnapshots.last(where: { $0.date <= fiveMinAgo }) {
+            let diff = recent - older.percent
+            if diff > 3 { return .rising }
+            if diff < -3 { return .falling }
         }
-
-        // Trigger UI update
-        objectWillChange.send()
+        return .steady
     }
 
     func reset() {
         map = ParkingLotMap()
+        occupancySnapshots = []
+        previousMap = nil
         startPolling()
     }
 
@@ -679,8 +802,32 @@ class ParkingLotViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 let response = try await apiService.fetchParkingData()
+
+                // Snapshot previous state for notification diffing
+                previousMap = copyMap(map)
+
                 applyAPIResponse(response)
                 isConnected = true
+
+                // Record occupancy snapshot
+                let percent = occupancyPercent
+                occupancySnapshots.append((date: Date(), percent: percent))
+                // Keep last 10 minutes of snapshots
+                let cutoff = Date().addingTimeInterval(-600)
+                occupancySnapshots.removeAll { $0.date < cutoff }
+
+                // Parse lastSync
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                lastSync = formatter.date(from: response.lastSync) ?? Date()
+
+                // Evaluate notifications
+                notificationManager?.evaluateChanges(
+                    previousMap: previousMap,
+                    currentMap: map,
+                    favorites: favoritesManager?.favorites ?? [],
+                    occupancyPercent: percent
+                )
             } catch {
                 isConnected = false
             }
@@ -688,19 +835,44 @@ class ParkingLotViewModel: ObservableObject {
     }
 
     private func applyAPIResponse(_ response: ParkingAPIResponse) {
+        // Build a new ParkingLotMap instance so @Published detects the change.
+        // Mutating the existing class in-place doesn't trigger SwiftUI re-renders.
+        let newMap = copyMap(map)
+
         for (rowIndex, row) in response.grid.enumerated() {
             for (colIndex, apiSpot) in row.enumerated() {
-                guard map.isValidPosition(row: rowIndex, col: colIndex) else { continue }
+                guard newMap.isValidPosition(row: rowIndex, col: colIndex) else { continue }
                 guard let spotStatus = SpotStatus(rawValue: apiSpot.status) else { continue }
                 guard spotStatus != .notASpot else { continue }
 
-                map.map[rowIndex][colIndex] = ParkingSpot(
+                newMap.map[rowIndex][colIndex] = ParkingSpot(
                     status: spotStatus,
                     isHandicap: apiSpot.isHandicap
                 )
             }
         }
-        objectWillChange.send()
+
+        // Apply sensor data from the sensors dictionary
+        if let sensors = response.sensors {
+            for (spotIdStr, sensorData) in sensors {
+                guard let spotId = Int(spotIdStr),
+                      let pos = ParkingLotMap.position(forSpotNumber: spotId) else { continue }
+                newMap.map[pos.row][pos.col].sensorData = sensorData
+            }
+        }
+
+        // Assigning a new instance triggers @Published → objectWillChange automatically
+        self.map = newMap
+    }
+
+    private func copyMap(_ source: ParkingLotMap) -> ParkingLotMap {
+        let copy = ParkingLotMap()
+        for row in 0..<ParkingLotMap.totalRows {
+            for col in 0..<ParkingLotMap.spotsPerRow {
+                copy.map[row][col] = source.map[row][col]
+            }
+        }
+        return copy
     }
 }
 
@@ -709,4 +881,6 @@ class ParkingLotViewModel: ObservableObject {
         ParkingLotDetailView()
     }
     .environmentObject(AppSettings())
+    .environmentObject(ParkingLotViewModel())
+    .environmentObject(FavoritesManager())
 }
