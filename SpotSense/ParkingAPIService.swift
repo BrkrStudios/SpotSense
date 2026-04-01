@@ -39,7 +39,7 @@ struct ParkingAPIResponse: Codable {
 
 class ParkingAPIService {
     /// Admin portal URL. Update this to the Railway deployment URL after deploying.
-    static let baseURL = "https://spotsense-admin-portal.up.railway.app"
+    static let baseURL = "https://admin-portal-production-9bde.up.railway.app"
     static let apiKey = "spotsense-2026-demo"
 
     func fetchParkingData() async throws -> ParkingAPIResponse {
