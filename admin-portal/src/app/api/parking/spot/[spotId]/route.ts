@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getMockParkingData } from "@/lib/mock-data";
 import { isRealSpot, getRealSpotsData } from "@/lib/sensor";
 import { TOTAL_NUMBERED_SPOTS } from "@/lib/constants";
+import { validateApiKey } from "@/lib/api-auth";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
 };
 
 export async function OPTIONS() {
@@ -17,6 +18,12 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ spotId: string }> }
 ) {
+  if (!validateApiKey(_request)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: CORS_HEADERS }
+    );
+  }
   const { spotId: spotIdStr } = await params;
   const spotId = parseInt(spotIdStr, 10);
 

@@ -6,9 +6,18 @@
 const API_KEY = process.env.SPOTSENSE_API_KEY || "spotsense-2026-demo";
 
 export function validateApiKey(request: Request): boolean {
-  // Exempt same-origin requests (admin portal frontend)
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
+  const host = request.headers.get("host");
+
+  // Exempt same-origin requests (admin portal frontend).
+  // Same-origin GET requests typically send neither Origin nor Referer.
+  if (!origin && !referer) return true;
+
+  // If origin or referer matches the deployment host, it's same-origin.
+  if (host && (origin?.includes(host) || referer?.includes(host))) return true;
+
+  // Localhost exemption for local dev
   if (
     origin?.includes("localhost") ||
     origin?.includes("127.0.0.1") ||

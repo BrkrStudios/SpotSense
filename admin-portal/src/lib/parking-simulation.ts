@@ -220,7 +220,7 @@ function startSimulation(state: SimulationState): void {
   };
 
   fetchRealSpots();
-  state.realSpotInterval = setInterval(fetchRealSpots, 3000);
+  state.realSpotInterval = setInterval(fetchRealSpots, 1500);
 }
 
 /**

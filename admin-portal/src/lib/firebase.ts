@@ -39,7 +39,8 @@ export interface FirestoreReading {
 
 /**
  * Fetch the latest sensor reading for each given Firebase spotId (e.g. "A12", "B1").
- * Uses simple single-field queries (no composite index needed) and sorts client-side.
+ * Uses equality-only queries to avoid needing Firestore composite indexes,
+ * then sorts client-side to find the latest reading.
  */
 export async function fetchLatestReadings(
   firebaseSpotIds: string[]
@@ -47,45 +48,42 @@ export async function fetchLatestReadings(
   const firestore = getDb();
   const results: Record<string, FirestoreReading> = {};
 
-  // Query for each spotId in parallel — order by timestamp desc, take latest 1
-  // Also fetch latest-with-image separately so we always have a snapshot URL
   const queries = firebaseSpotIds.map(async (spotId) => {
     try {
-      const [latestSnap, latestImageSnap] = await Promise.all([
-        firestore
-          .collection("sensor_readings")
-          .where("spotId", "==", spotId)
-          .orderBy("timestamp", "desc")
-          .limit(1)
-          .get(),
-        firestore
-          .collection("sensor_readings")
-          .where("spotId", "==", spotId)
-          .where("imagePath", "!=", "")
-          .orderBy("imagePath")
-          .orderBy("timestamp", "desc")
-          .limit(1)
-          .get(),
-      ]);
+      // Single-field equality query — no composite index needed.
+      // Fetch a small batch and sort client-side to find the latest.
+      const snap = await firestore
+        .collection("sensor_readings")
+        .where("spotId", "==", spotId)
+        .limit(50)
+        .get();
 
-      if (!latestSnap.empty) {
-        const data = latestSnap.docs[0].data();
-        const latest: FirestoreReading = {
-          spotId: data.spotId,
-          deviceId: data.deviceId,
-          occupied: data.occupied,
-          distanceMm: data.distanceMm,
-          imagePath: data.imagePath || "",
-          timestamp: data.timestamp,
-        };
+      if (snap.empty) return;
 
-        // Fill in image from the latest-with-image query if the newest reading has none
-        if (!latest.imagePath && !latestImageSnap.empty) {
-          latest.imagePath = latestImageSnap.docs[0].data().imagePath || "";
+      // Sort client-side by timestamp descending
+      const docs = snap.docs
+        .map((d) => d.data())
+        .sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+
+      const latestDoc = docs[0];
+      const latest: FirestoreReading = {
+        spotId: latestDoc.spotId,
+        deviceId: latestDoc.deviceId,
+        occupied: latestDoc.occupied,
+        distanceMm: latestDoc.distanceMm,
+        imagePath: latestDoc.imagePath || "",
+        timestamp: latestDoc.timestamp,
+      };
+
+      // If the latest reading has no image, find the most recent one that does
+      if (!latest.imagePath) {
+        const withImage = docs.find((d) => d.imagePath);
+        if (withImage) {
+          latest.imagePath = withImage.imagePath;
         }
-
-        results[spotId] = latest;
       }
+
+      results[spotId] = latest;
     } catch (err) {
       console.error(`[Firebase] Error fetching readings for ${spotId}:`, err);
     }
