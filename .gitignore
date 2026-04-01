@@ -44,3 +44,5 @@ firebase-service-account.json
 *.log
 npm-debug.log*
 .turbo/
+tsconfig.tsbuildinfo
+admin-portal/tsconfig.tsbuildinfo
