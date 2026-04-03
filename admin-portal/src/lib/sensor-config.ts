@@ -8,13 +8,13 @@ export interface RealSpotConfig {
   spotNumber: number;       // Grid spot number (245, 267)
   row: number;              // Grid row index
   col: number;              // Grid column index
-  firebaseSpotId: string;   // Firestore spotId field ("A12", "B1")
+  firebaseSpotId: string;   // Firestore spotId field ("A12", "B12")
   deviceId: string;         // Pi Zero device name
 }
 
 export const REAL_SPOTS: RealSpotConfig[] = [
   { spotNumber: 245, row: 18, col: 2, firebaseSpotId: "A12", deviceId: "spotsense-zero-001" },
-  { spotNumber: 267, row: 19, col: 2, firebaseSpotId: "B1",  deviceId: "spotsense-zero-002" },
+  { spotNumber: 267, row: 19, col: 2, firebaseSpotId: "B12", deviceId: "spotsense-zero-002" },
 ];
 
 /** Set of all real spot numbers for fast lookups */
