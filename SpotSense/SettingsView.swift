@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showPrivacyPolicy = false
     @EnvironmentObject var appSettings: AppSettings
     @EnvironmentObject var notificationManager: NotificationManager
+    @EnvironmentObject var parkingLot: ParkingLotViewModel
 
     var body: some View {
         NavigationStack {
@@ -31,21 +32,23 @@ struct SettingsView: View {
                         Label("Favorite Spot Opens", systemImage: "heart.fill")
                     }
 
-                    Toggle(isOn: $notificationManager.nearbySpotAlerts) {
-                        Label("Nearby Spot Opens", systemImage: "location.fill")
-                    }
-
                     Toggle(isOn: $notificationManager.highOccupancyAlerts) {
                         Label("Lot Nearly Full", systemImage: "exclamationmark.triangle.fill")
                     }
 
                     if notificationManager.highOccupancyAlerts {
-                        Stepper(
-                            "Threshold: \(notificationManager.highThreshold)%",
-                            value: $notificationManager.highThreshold,
-                            in: 70...100,
-                            step: 5
-                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Threshold: \(notificationManager.highThreshold)%")
+                                .font(.subheadline)
+                            Slider(
+                                value: Binding(
+                                    get: { Double(notificationManager.highThreshold) },
+                                    set: { notificationManager.highThreshold = Int($0) }
+                                ),
+                                in: 70...100,
+                                step: 5
+                            )
+                        }
                         .padding(.leading, 28)
                     }
 
@@ -54,12 +57,18 @@ struct SettingsView: View {
                     }
 
                     if notificationManager.lowOccupancyAlerts {
-                        Stepper(
-                            "Threshold: \(notificationManager.lowThreshold)%",
-                            value: $notificationManager.lowThreshold,
-                            in: 10...70,
-                            step: 5
-                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Threshold: \(notificationManager.lowThreshold)%")
+                                .font(.subheadline)
+                            Slider(
+                                value: Binding(
+                                    get: { Double(notificationManager.lowThreshold) },
+                                    set: { notificationManager.lowThreshold = Int($0) }
+                                ),
+                                in: 10...70,
+                                step: 5
+                            )
+                        }
                         .padding(.leading, 28)
                     }
 
@@ -79,10 +88,10 @@ struct SettingsView: View {
                 }
 
                 Section("Parking") {
-                    Button(role: .destructive) {
-                        appSettings.shouldResetParkingData = true
+                    Button {
+                        parkingLot.fetchData()
                     } label: {
-                        Label("Reset Parking Data", systemImage: "arrow.counterclockwise")
+                        Label("Refresh Data", systemImage: "arrow.clockwise")
                     }
                 }
 
@@ -101,7 +110,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationBarHidden(true)
             .scrollContentBackground(appSettings.theme.needsCustomBackground ? .hidden : .visible)
             .background(appSettings.theme.backgroundColor ?? Color.clear)
             .sheet(isPresented: $showPrivacyPolicy) {
@@ -171,4 +180,5 @@ struct PrivacyPolicyView: View {
     SettingsView()
         .environmentObject(AppSettings())
         .environmentObject(NotificationManager())
+        .environmentObject(ParkingLotViewModel())
 }

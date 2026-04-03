@@ -798,7 +798,7 @@ class ParkingLotViewModel: ObservableObject {
         }
     }
 
-    private func fetchData() {
+    func fetchData() {
         Task { @MainActor in
             do {
                 let response = try await apiService.fetchParkingData()

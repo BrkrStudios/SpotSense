@@ -25,7 +25,7 @@ struct FavoritesView: View {
                     favoritesList
                 }
             }
-            .navigationTitle("Favorites")
+            .navigationBarHidden(true)
             .scrollContentBackground(appSettings.theme.needsCustomBackground ? .hidden : .visible)
             .background(appSettings.theme.backgroundColor ?? Color.clear)
         }

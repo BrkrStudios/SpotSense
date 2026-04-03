@@ -35,7 +35,7 @@ struct SpotDetailSheet: View {
                     statusSection
 
                     if let sensor = spot.sensorData {
-                        sensorSection(sensor)
+                        statusSinceSection(sensor)
                     }
 
                     if let url = spot.sensorData?.cameraSnapshotUrl, !url.isEmpty {
@@ -115,48 +115,53 @@ struct SpotDetailSheet: View {
         .cornerRadius(14)
     }
 
-    // MARK: - Sensor Data
+    // MARK: - Status Since
 
-    private func sensorSection(_ sensor: ParkingAPISensorData) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Sensor Reading", systemImage: "sensor.fill")
-                .font(.subheadline.weight(.semibold))
+    private func statusSinceSection(_ sensor: ParkingAPISensorData) -> some View {
+        let statusLabel = spot.isAvailable ? "Available since" : "Occupied since"
+        let statusColor: Color = spot.isAvailable ? .green : .red
+        let timeText = formatSinceTime(sensor.lastUpdated)
 
-            HStack(spacing: 20) {
-                VStack(spacing: 4) {
-                    Text("\(sensor.distanceMm)")
-                        .font(.title2.weight(.bold).monospacedDigit())
-                    Text("mm")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+        return HStack {
+            Image(systemName: spot.isAvailable ? "clock.badge.checkmark" : "clock.badge.xmark")
+                .font(.title2)
+                .foregroundColor(statusColor)
 
-                Divider().frame(height: 40)
-
-                VStack(spacing: 4) {
-                    Image(systemName: sensor.sensorOnline ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(sensor.sensorOnline ? .green : .red)
-                        .font(.title2)
-                    Text(sensor.sensorOnline ? "Online" : "Offline")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
-                Divider().frame(height: 40)
-
-                VStack(spacing: 4) {
-                    Text(sensor.objectDetected ? "Yes" : "No")
-                        .font(.title2.weight(.bold))
-                    Text("Detected")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(statusLabel)
+                    .font(.subheadline.weight(.semibold))
+                Text(timeText)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .frame(maxWidth: .infinity)
+
+            Spacer()
         }
         .padding()
         .background(.ultraThinMaterial)
         .cornerRadius(14)
+    }
+
+    private func formatSinceTime(_ isoString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        guard let date = formatter.date(from: isoString) else {
+            // Try without fractional seconds
+            let fallback = ISO8601DateFormatter()
+            fallback.formatOptions = [.withInternetDateTime]
+            guard let date = fallback.date(from: isoString) else {
+                return isoString
+            }
+            return relativeTime(from: date)
+        }
+        return relativeTime(from: date)
+    }
+
+    private func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     // MARK: - Camera

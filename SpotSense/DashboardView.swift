@@ -49,7 +49,7 @@ struct DashboardView: View {
                 }
                 .padding(.top, 8)
             }
-            .navigationTitle("Dashboard")
+            .navigationBarHidden(true)
             .scrollContentBackground(appSettings.theme.needsCustomBackground ? .hidden : .visible)
             .background(appSettings.theme.backgroundColor ?? Color.clear)
         }
