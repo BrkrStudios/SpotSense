@@ -11,6 +11,7 @@ struct SpotDetailSheet: View {
     let spotNumber: Int
     let spot: ParkingSpot
     @EnvironmentObject var favoritesManager: FavoritesManager
+    @State private var animateIn = false
 
     private var section: String {
         LotSection.section(forSpotNumber: spotNumber)?.rawValue ?? "?"
@@ -20,6 +21,10 @@ struct SpotDetailSheet: View {
         favoritesManager.isFavorite(spotNumber)
     }
 
+    private var statusColor: Color {
+        spot.isAvailable ? .green : .red
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Handle bar
@@ -27,33 +32,48 @@ struct SpotDetailSheet: View {
                 .fill(Color.secondary.opacity(0.4))
                 .frame(width: 40, height: 5)
                 .padding(.top, 10)
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
 
-            ScrollView {
-                VStack(spacing: 20) {
-                    headerSection
-                    statusSection
+            VStack(spacing: 24) {
+                // Top: big status badge + spot info
+                headerCard
 
-                    if let sensor = spot.sensorData {
-                        statusSinceSection(sensor)
-                    }
+                // Info grid
+                infoGrid
 
-                    if let url = spot.sensorData?.cameraSnapshotUrl, !url.isEmpty {
-                        cameraSection(url)
-                    }
-
-                    Spacer(minLength: 20)
-                }
-                .padding(.horizontal)
+                // Favorite button
+                favoriteButton
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 32)
         }
+        .onAppear { withAnimation(.easeOut(duration: 0.4)) { animateIn = true } }
     }
 
-    // MARK: - Header
+    // MARK: - Header Card
 
-    private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+    private var headerCard: some View {
+        VStack(spacing: 16) {
+            // Status circle
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.15))
+                    .frame(width: 80, height: 80)
+
+                Circle()
+                    .fill(statusColor.gradient)
+                    .frame(width: 56, height: 56)
+                    .shadow(color: statusColor.opacity(0.4), radius: 12, y: 4)
+
+                Image(systemName: spot.isAvailable ? "checkmark" : "xmark")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .scaleEffect(animateIn ? 1 : 0.5)
+            .opacity(animateIn ? 1 : 0)
+
+            // Spot number + section
+            VStack(spacing: 4) {
                 Text("Spot \(spotNumber)")
                     .font(.title.weight(.bold))
 
@@ -63,6 +83,8 @@ struct SpotDetailSheet: View {
                         .foregroundColor(.secondary)
 
                     if spot.isHandicap {
+                        Text("\u{2022}")
+                            .foregroundColor(.secondary)
                         Label("Handicap", systemImage: "figure.roll")
                             .font(.caption.weight(.medium))
                             .foregroundColor(.blue)
@@ -70,84 +92,83 @@ struct SpotDetailSheet: View {
                 }
             }
 
-            Spacer()
-
-            // Favorite toggle
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    favoritesManager.toggle(spotNumber)
-                }
-            } label: {
-                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                    .font(.title2)
-                    .foregroundColor(isFavorite ? .pink : .secondary)
-                    .symbolEffect(.bounce, value: isFavorite)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: - Status
-
-    private var statusSection: some View {
-        HStack {
-            Circle()
-                .fill(spot.isAvailable ? Color.green : Color.red)
-                .frame(width: 14, height: 14)
-
+            // Status pill
             Text(spot.isAvailable ? "Available" : "Occupied")
-                .font(.headline)
-
-            Spacer()
-
-            if spot.hasSensor {
-                Label("Live Sensor", systemImage: "antenna.radiowaves.left.and.right")
-                    .font(.caption.weight(.medium))
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.12))
-                    .cornerRadius(8)
-            }
-        }
-        .padding()
-        .background(.ultraThinMaterial)
-        .cornerRadius(14)
-    }
-
-    // MARK: - Status Since
-
-    private func statusSinceSection(_ sensor: ParkingAPISensorData) -> some View {
-        let statusLabel = spot.isAvailable ? "Available since" : "Occupied since"
-        let statusColor: Color = spot.isAvailable ? .green : .red
-        let timeText = formatSinceTime(sensor.lastUpdated)
-
-        return HStack {
-            Image(systemName: spot.isAvailable ? "clock.badge.checkmark" : "clock.badge.xmark")
-                .font(.title2)
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(statusColor)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(statusLabel)
-                    .font(.subheadline.weight(.semibold))
-                Text(timeText)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(statusColor.opacity(0.12))
+                .clipShape(Capsule())
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .cornerRadius(14)
     }
+
+    // MARK: - Info Grid
+
+    private var infoGrid: some View {
+        let sinceText: String = {
+            if let sensor = spot.sensorData {
+                return formatSinceTime(sensor.lastUpdated)
+            }
+            return "just now"
+        }()
+
+        return HStack(spacing: 12) {
+            // Status duration
+            InfoTile(
+                icon: spot.isAvailable ? "clock.badge.checkmark" : "clock.badge.xmark",
+                iconColor: statusColor,
+                label: spot.isAvailable ? "Available" : "Occupied",
+                value: sinceText
+            )
+
+            // Section info
+            InfoTile(
+                icon: "map.fill",
+                iconColor: .blue,
+                label: "Section",
+                value: section
+            )
+        }
+    }
+
+    // MARK: - Favorite Button
+
+    private var favoriteButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                favoritesManager.toggle(spotNumber)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(isFavorite ? .pink : .primary)
+                    .symbolEffect(.bounce, value: isFavorite)
+
+                Text(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                    .font(.body.weight(.medium))
+                    .foregroundColor(isFavorite ? .pink : .primary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(isFavorite ? Color.pink.opacity(0.1) : Color(.secondarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(isFavorite ? Color.pink.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Helpers
 
     private func formatSinceTime(_ isoString: String) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         guard let date = formatter.date(from: isoString) else {
-            // Try without fractional seconds
             let fallback = ISO8601DateFormatter()
             fallback.formatOptions = [.withInternetDateTime]
             guard let date = fallback.date(from: isoString) else {
@@ -163,43 +184,41 @@ struct SpotDetailSheet: View {
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: Date())
     }
+}
 
-    // MARK: - Camera
+// MARK: - Info Tile
 
-    private func cameraSection(_ urlString: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Camera Snapshot", systemImage: "camera.fill")
-                .font(.subheadline.weight(.semibold))
+struct InfoTile: View {
+    let icon: String
+    let iconColor: Color
+    let label: String
+    let value: String
 
-            if let url = URL(string: urlString) {
-                // Spot 245 = A12 camera is upside down
-                let needsFlip = spotNumber == 245
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .rotationEffect(needsFlip ? .degrees(180) : .zero)
-                            .cornerRadius(10)
-                    case .failure:
-                        Label("Failed to load image", systemImage: "exclamationmark.triangle")
-                            .foregroundColor(.secondary)
-                            .frame(height: 120)
-                            .frame(maxWidth: .infinity)
-                    case .empty:
-                        ProgressView()
-                            .frame(height: 120)
-                            .frame(maxWidth: .infinity)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(iconColor)
+
+            VStack(spacing: 2) {
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+
+                Text(value)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
             }
         }
-        .padding()
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 8)
         .background(.ultraThinMaterial)
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 

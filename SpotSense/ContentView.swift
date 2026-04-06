@@ -204,7 +204,7 @@ struct ParkingLotDetailView: View {
         GeometryReader { geo in
             let viewCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
 
-            ParkingLotView(parkingLot: parkingLot, favoritesManager: favoritesManager, onSpotTap: { spotNum in
+            ParkingLotView(parkingLot: parkingLot, favoritesManager: favoritesManager, selectedSpotNumber: selectedSpotNumber, showSpotNumbers: appSettings.showSpotNumbers, onSpotTap: { spotNum in
                 selectedSpotNumber = spotNum
             })
                 .rotationEffect(currentRotation)
@@ -270,27 +270,57 @@ struct ParkingLotDetailView: View {
 
     private var overlayLayer: some View {
         VStack {
-            HStack(spacing: 12) {
-                StatCircle(value: parkingLot.availableCount, color: ParkingLotLayout.spotAvailable, icon: "car.fill")
-                StatCircle(value: parkingLot.occupiedCount, color: ParkingLotLayout.spotOccupied, icon: "car.fill")
-                StatCircle(value: parkingLot.handicapAvailableCount, color: ParkingLotLayout.handicapBlue, icon: "figure.roll")
-
-                Spacer()
-
-                // Connection status indicator
-                VStack(spacing: 2) {
+            HStack(spacing: 0) {
+                HStack(spacing: 5) {
                     Circle()
-                        .fill(parkingLot.isConnected ? Color.green : Color.red)
-                        .frame(width: 10, height: 10)
-                    Text(parkingLot.isConnected ? "Live" : "Offline")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .fill(ParkingLotLayout.spotAvailable)
+                        .frame(width: 8, height: 8)
+                    Text("\(parkingLot.availableCount)")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(width: 1, height: 18)
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(ParkingLotLayout.spotOccupied)
+                        .frame(width: 8, height: 8)
+                    Text("\(parkingLot.occupiedCount)")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                if appSettings.showHandicapIndicator {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.25))
+                        .frame(width: 1, height: 18)
+
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(ParkingLotLayout.handicapBlue)
+                            .frame(width: 8, height: 8)
+                        Text("\(parkingLot.handicapAvailableCount)")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
             }
-            .padding(.top, 8)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
 
             Spacer()
         }
+        .padding(.top, 8)
         .padding(.horizontal)
     }
 
@@ -357,6 +387,8 @@ struct SpotSelection: Identifiable {
 struct ParkingLotView: View {
     @ObservedObject var parkingLot: ParkingLotViewModel
     @ObservedObject var favoritesManager: FavoritesManager
+    var selectedSpotNumber: Int? = nil
+    var showSpotNumbers: Bool = true
     var onSpotTap: (Int) -> Void
 
     // Lane types for each driving lane row index
@@ -418,6 +450,8 @@ struct ParkingLotView: View {
                         favoritesManager: favoritesManager,
                         rowIndex: aisle.top,
                         facingUp: true,
+                        selectedSpotNumber: selectedSpotNumber,
+                        showSpotNumbers: showSpotNumbers,
                         onSpotTap: onSpotTap
                     )
 
@@ -428,6 +462,8 @@ struct ParkingLotView: View {
                             favoritesManager: favoritesManager,
                             rowIndex: bottom,
                             facingUp: false,
+                            selectedSpotNumber: selectedSpotNumber,
+                            showSpotNumbers: showSpotNumbers,
                             onSpotTap: onSpotTap
                         )
                     }
@@ -456,6 +492,8 @@ struct ParkingRowView: View {
     @ObservedObject var favoritesManager: FavoritesManager
     let rowIndex: Int
     let facingUp: Bool
+    var selectedSpotNumber: Int? = nil
+    var showSpotNumbers: Bool = true
     var onSpotTap: (Int) -> Void
 
     var body: some View {
@@ -471,7 +509,9 @@ struct ParkingRowView: View {
                     facingUp: facingUp,
                     spotNumber: spotNum,
                     isGrass: isGrass,
-                    isFavorite: isFav
+                    isFavorite: isFav,
+                    isSelected: spotNum != 0 && spotNum == selectedSpotNumber,
+                    showSpotNumber: showSpotNumbers
                 )
                 .onTapGesture {
                     if !isGrass && parkingLot.map.map[rowIndex][col].status != .notASpot {
@@ -493,6 +533,8 @@ struct ParkingSpotView: View {
     let spotNumber: Int
     let isGrass: Bool
     var isFavorite: Bool = false
+    var isSelected: Bool = false
+    var showSpotNumber: Bool = true
 
     var isUnusable: Bool {
         spot.status == .notASpot && !isGrass
@@ -537,6 +579,22 @@ struct ParkingSpotView: View {
                         .padding(.horizontal, 3)
                         .padding(.vertical, 4)
 
+                    // Favorite outline
+                    if isFavorite {
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.pink, lineWidth: 1.5)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 4)
+                    }
+
+                    // Selected outline
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.white, lineWidth: 2)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 4)
+                    }
+
                     // Handicap icon overlay
                     if spot.isHandicap {
                         Image(systemName: "figure.roll")
@@ -546,37 +604,18 @@ struct ParkingSpotView: View {
 
                     // Favorite heart overlay
                     if isFavorite {
-                        VStack {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "heart.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundColor(.pink)
-                            }
-                            Spacer()
-                        }
-                        .padding(4)
-                    }
-
-                    // Live sensor indicator
-                    if spot.hasSensor {
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Image(systemName: "antenna.radiowaves.left.and.right")
-                                    .font(.system(size: 5))
-                                    .foregroundColor(.orange)
-                                Spacer()
-                            }
-                        }
-                        .padding(4)
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.pink)
                     }
 
                     // Spot number label
-                    Text("\(spotNumber)")
-                        .font(.system(size: 7, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.85))
-                        .offset(y: facingUp ? -16 : 16)
+                    if showSpotNumber {
+                        Text("\(spotNumber)")
+                            .font(.system(size: 7, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.85))
+                            .offset(y: facingUp ? -16 : 16)
+                    }
                 }
             }
         }

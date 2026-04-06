@@ -46,10 +46,30 @@ class AppSettings: ObservableObject {
     @Published var shouldResetParkingData: Bool = false
     @Published var selectedTab: Int = 0
     @Published var navigateToSpot: Int? = nil
+    @Published var showHandicapIndicator: Bool {
+        didSet { UserDefaults.standard.set(showHandicapIndicator, forKey: "showHandicapIndicator") }
+    }
+    @Published var showSpotNumbers: Bool {
+        didSet { UserDefaults.standard.set(showSpotNumbers, forKey: "showSpotNumbers") }
+    }
+    @Published var showFavoritesOnDashboard: Bool {
+        didSet { UserDefaults.standard.set(showFavoritesOnDashboard, forKey: "showFavoritesOnDashboard") }
+    }
+    @Published var showLastSync: Bool {
+        didSet { UserDefaults.standard.set(showLastSync, forKey: "showLastSync") }
+    }
+    @Published var compactDashboard: Bool {
+        didSet { UserDefaults.standard.set(compactDashboard, forKey: "compactDashboard") }
+    }
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue
         self.theme = AppTheme(rawValue: saved) ?? .system
+        self.showHandicapIndicator = UserDefaults.standard.object(forKey: "showHandicapIndicator") as? Bool ?? true
+        self.showSpotNumbers = UserDefaults.standard.object(forKey: "showSpotNumbers") as? Bool ?? true
+        self.showFavoritesOnDashboard = UserDefaults.standard.object(forKey: "showFavoritesOnDashboard") as? Bool ?? true
+        self.showLastSync = UserDefaults.standard.object(forKey: "showLastSync") as? Bool ?? true
+        self.compactDashboard = UserDefaults.standard.object(forKey: "compactDashboard") as? Bool ?? false
     }
 }
 

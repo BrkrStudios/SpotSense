@@ -2,7 +2,7 @@
 //  DashboardView.swift
 //  SpotSense
 //
-//  User-facing dashboard: occupancy overview, favorites summary, trend.
+//  User-facing dashboard: occupancy overview, favorites summary, quick stats.
 //
 
 import SwiftUI
@@ -15,32 +15,27 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Connection status
-                    HStack {
-                        Circle()
-                            .fill(parkingLot.isConnected ? Color.green : Color.red)
-                            .frame(width: 8, height: 8)
-                        Text(parkingLot.isConnected ? "Live" : "Offline")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-
-                    // Occupancy ring
+                VStack(spacing: appSettings.compactDashboard ? 14 : 20) {
+                    // Occupancy ring — always shown
                     occupancyRing
 
                     // Quick stats row
                     statsRow
 
                     // Favorites summary
-                    if !favoritesManager.favorites.isEmpty {
+                    if appSettings.showFavoritesOnDashboard && !favoritesManager.favorites.isEmpty {
                         favoritesSummary
                     }
 
-                    // Trend card
-                    trendCard
+                    // Section breakdown
+                    if !appSettings.compactDashboard {
+                        sectionBreakdown
+                    }
+
+                    // Last sync
+                    if appSettings.showLastSync, let lastSync = parkingLot.lastSync {
+                        lastSyncCard(lastSync)
+                    }
 
                     Spacer(minLength: 40)
                 }
@@ -56,29 +51,47 @@ struct DashboardView: View {
 
     private var occupancyRing: some View {
         let percent = parkingLot.occupancyPercent
+        let available = parkingLot.availableCount
+        let total = parkingLot.map.totalSpotCount()
         let color: Color = percent > 85 ? .red : percent > 60 ? .orange : .green
 
-        return VStack(spacing: 8) {
+        return VStack(spacing: 12) {
             ZStack {
+                // Track
                 Circle()
-                    .stroke(color.opacity(0.15), lineWidth: 16)
-                    .frame(width: 160, height: 160)
+                    .stroke(color.opacity(0.12), lineWidth: 18)
+                    .frame(width: 170, height: 170)
 
+                // Fill
                 Circle()
                     .trim(from: 0, to: CGFloat(percent) / 100)
-                    .stroke(color, style: StrokeStyle(lineWidth: 16, lineCap: .round))
-                    .frame(width: 160, height: 160)
+                    .stroke(
+                        AngularGradient(
+                            colors: [color.opacity(0.7), color],
+                            center: .center,
+                            startAngle: .degrees(0),
+                            endAngle: .degrees(360)
+                        ),
+                        style: StrokeStyle(lineWidth: 18, lineCap: .round)
+                    )
+                    .frame(width: 170, height: 170)
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 0.6), value: percent)
 
+                // Center text
                 VStack(spacing: 2) {
                     Text("\(percent)%")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
                     Text("Occupied")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
+
+            // Sub-label
+            Text("\(available) of \(total) spots available")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
         .padding(.vertical, 8)
     }
@@ -96,15 +109,17 @@ struct DashboardView: View {
             DashboardStatCard(
                 title: "Occupied",
                 value: "\(parkingLot.occupiedCount)",
-                icon: "xmark.circle.fill",
+                icon: "car.side.fill",
                 color: .red
             )
-            DashboardStatCard(
-                title: "Handicap",
-                value: "\(parkingLot.handicapAvailableCount)",
-                icon: "figure.roll",
-                color: .blue
-            )
+            if appSettings.showHandicapIndicator {
+                DashboardStatCard(
+                    title: "Handicap",
+                    value: "\(parkingLot.handicapAvailableCount)",
+                    icon: "figure.roll",
+                    color: .blue
+                )
+            }
         }
         .padding(.horizontal)
     }
@@ -114,60 +129,156 @@ struct DashboardView: View {
     private var favoritesSummary: some View {
         let total = favoritesManager.favorites.count
         let available = favoritesManager.availableFavoritesCount(in: parkingLot.map)
+        let color: Color = available > 0 ? .green : .red
 
-        return HStack {
-            Image(systemName: "heart.fill")
-                .foregroundColor(.pink)
-            VStack(alignment: .leading, spacing: 2) {
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.pink.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.pink)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Your Favorites")
                     .font(.subheadline.weight(.semibold))
                 Text("\(available) of \(total) available")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
             Spacer()
+
             Text("\(available)/\(total)")
                 .font(.title2.weight(.bold).monospacedDigit())
-                .foregroundColor(available > 0 ? .green : .red)
+                .foregroundColor(color)
         }
-        .padding()
+        .padding(16)
         .background(.ultraThinMaterial)
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal)
     }
 
-    // MARK: - Trend Card
+    // MARK: - Section Breakdown
 
-    private var trendCard: some View {
-        let trend = parkingLot.occupancyTrend
+    private var sectionBreakdown: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("BY SECTION")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+                .padding(.leading, 4)
 
-        return HStack {
-            Image(systemName: trend.icon)
-                .font(.title2)
-                .foregroundColor(trend.color)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Trend")
-                    .font(.subheadline.weight(.semibold))
-                Text(trend.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            if let lastSync = parkingLot.lastSync {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Last Update")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text(lastSync, style: .time)
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.secondary)
+            VStack(spacing: 6) {
+                ForEach(LotSection.allCases, id: \.self) { section in
+                    let stats = sectionStats(section)
+                    SectionBarRow(
+                        name: section.rawValue,
+                        available: stats.available,
+                        total: stats.total
+                    )
                 }
             }
+            .padding(14)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .cornerRadius(14)
         .padding(.horizontal)
+    }
+
+    private func sectionStats(_ section: LotSection) -> (available: Int, total: Int) {
+        var available = 0
+        var total = 0
+        for spotNum in section.spotRange {
+            guard let pos = ParkingLotMap.position(forSpotNumber: spotNum) else { continue }
+            let spot = parkingLot.map.map[pos.row][pos.col]
+            guard spot.status != .notASpot else { continue }
+            total += 1
+            if spot.isAvailable { available += 1 }
+        }
+        return (available, total)
+    }
+
+    // MARK: - Last Sync
+
+    private func lastSyncCard(_ date: Date) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.caption)
+                .foregroundColor(parkingLot.isConnected ? .green : .red)
+
+            Text(parkingLot.isConnected ? "Connected" : "Offline")
+                .font(.caption.weight(.medium))
+                .foregroundColor(parkingLot.isConnected ? .green : .red)
+
+            Spacer()
+
+            Text("Updated ")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            +
+            Text(date, style: .relative)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            +
+            Text(" ago")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Section Bar Row
+
+struct SectionBarRow: View {
+    let name: String
+    let available: Int
+    let total: Int
+
+    private var fillPercent: CGFloat {
+        guard total > 0 else { return 0 }
+        return CGFloat(total - available) / CGFloat(total)
+    }
+
+    private var barColor: Color {
+        let pct = fillPercent
+        if pct > 0.85 { return .red }
+        if pct > 0.6 { return .orange }
+        return .green
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(name)
+                .font(.caption.weight(.medium))
+                .frame(width: 70, alignment: .leading)
+                .lineLimit(1)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(barColor.opacity(0.15))
+                        .frame(height: 8)
+
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(barColor.gradient)
+                        .frame(width: geo.size.width * fillPercent, height: 8)
+                        .animation(.easeInOut(duration: 0.4), value: fillPercent)
+                }
+            }
+            .frame(height: 8)
+
+            Text("\(available)")
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundColor(available > 0 ? .green : .red)
+                .frame(width: 24, alignment: .trailing)
+        }
     }
 }
 
@@ -195,7 +306,7 @@ struct DashboardStatCard: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(.ultraThinMaterial)
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
