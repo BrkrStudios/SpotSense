@@ -40,6 +40,35 @@ export function isSpotAvailable(spot: ParkingSpot): boolean {
   );
 }
 
+/** Timezone of the physical parking lot. All occupancy profiles are in local time. */
+export const PARKING_LOT_TIMEZONE = 'America/New_York';
+
+/**
+ * Returns the current local hour and day-of-week in the parking lot's timezone.
+ * Fixes a bug where new Date().getHours() returns UTC on the server (Railway),
+ * causing occupancy profiles (designed around local class hours) to be evaluated
+ * at the wrong time — e.g. 1 PM EST appears as 5 PM UTC, giving ~18% instead of ~84%.
+ */
+export function getParkingLotLocalTime(): { hour: number; dayOfWeek: number } {
+  const now = new Date();
+  const dayStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: PARKING_LOT_TIMEZONE,
+    weekday: 'short',
+  }).format(now);
+  const timeStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: PARKING_LOT_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now);
+
+  const weekdays: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dayOfWeek = weekdays[dayStr] ?? 0;
+  const [hourStr, minuteStr] = timeStr.split(':');
+  const hour = (parseInt(hourStr, 10) % 24) + parseInt(minuteStr, 10) / 60;
+  return { hour, dayOfWeek };
+}
+
 /** Seeded random number generator for consistent mock data */
 export function seededRandom(seed: number): () => number {
   let s = seed;

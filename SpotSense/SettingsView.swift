@@ -52,26 +52,6 @@ struct SettingsView: View {
                         .padding(.leading, 28)
                     }
 
-                    Toggle(isOn: $notificationManager.lowOccupancyAlerts) {
-                        Label("Lot Has Space", systemImage: "checkmark.circle.fill")
-                    }
-
-                    if notificationManager.lowOccupancyAlerts {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Threshold: \(notificationManager.lowThreshold)%")
-                                .font(.subheadline)
-                            Slider(
-                                value: Binding(
-                                    get: { Double(notificationManager.lowThreshold) },
-                                    set: { notificationManager.lowThreshold = Int($0) }
-                                ),
-                                in: 10...70,
-                                step: 5
-                            )
-                        }
-                        .padding(.leading, 28)
-                    }
-
                     if !notificationManager.isAuthorized {
                         HStack {
                             Image(systemName: "bell.slash")

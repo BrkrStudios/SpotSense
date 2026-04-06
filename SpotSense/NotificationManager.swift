@@ -21,16 +21,9 @@ class NotificationManager: ObservableObject {
     @Published var highOccupancyAlerts: Bool {
         didSet { UserDefaults.standard.set(highOccupancyAlerts, forKey: "notif_highOccupancy") }
     }
-    @Published var lowOccupancyAlerts: Bool {
-        didSet { UserDefaults.standard.set(lowOccupancyAlerts, forKey: "notif_lowOccupancy") }
-    }
     @Published var highThreshold: Int {
         didSet { UserDefaults.standard.set(highThreshold, forKey: "notif_highThreshold") }
     }
-    @Published var lowThreshold: Int {
-        didSet { UserDefaults.standard.set(lowThreshold, forKey: "notif_lowThreshold") }
-    }
-
     @Published var isAuthorized: Bool = false
 
     // MARK: - Debounce State
@@ -41,16 +34,12 @@ class NotificationManager: ObservableObject {
     private var notifiedNearbySpots: Set<Int> = []
     /// Whether we've already fired the high occupancy alert
     private var highOccupancyFired: Bool = false
-    /// Whether we've already fired the low occupancy alert
-    private var lowOccupancyFired: Bool = false
 
     init() {
         self.favoriteSpotAlerts = UserDefaults.standard.object(forKey: "notif_favoriteSpot") as? Bool ?? true
         self.nearbySpotAlerts = UserDefaults.standard.object(forKey: "notif_nearbySpot") as? Bool ?? false
         self.highOccupancyAlerts = UserDefaults.standard.object(forKey: "notif_highOccupancy") as? Bool ?? true
-        self.lowOccupancyAlerts = UserDefaults.standard.object(forKey: "notif_lowOccupancy") as? Bool ?? true
         self.highThreshold = UserDefaults.standard.object(forKey: "notif_highThreshold") as? Int ?? 90
-        self.lowThreshold = UserDefaults.standard.object(forKey: "notif_lowThreshold") as? Int ?? 50
     }
 
     // MARK: - Permission
@@ -149,25 +138,11 @@ class NotificationManager: ObservableObject {
                 highOccupancyFired = true
                 sendNotification(
                     title: "Lot Nearly Full",
-                    body: "Parking Lot 3 is at \(occupancyPercent)% capacity.",
+                    body: "The lot is at \(occupancyPercent)% capacity.",
                     identifier: "high-occ-\(Date().timeIntervalSince1970)"
                 )
             } else if occupancyPercent < highThreshold - 5 {
                 highOccupancyFired = false // Reset with 5% hysteresis
-            }
-        }
-
-        // 4. Low occupancy alert (fire when crossing threshold downward)
-        if lowOccupancyAlerts {
-            if occupancyPercent <= lowThreshold && !lowOccupancyFired {
-                lowOccupancyFired = true
-                sendNotification(
-                    title: "Lot Has Space",
-                    body: "Parking Lot 3 is down to \(occupancyPercent)% — plenty of spots available!",
-                    identifier: "low-occ-\(Date().timeIntervalSince1970)"
-                )
-            } else if occupancyPercent > lowThreshold + 5 {
-                lowOccupancyFired = false // Reset with 5% hysteresis
             }
         }
     }

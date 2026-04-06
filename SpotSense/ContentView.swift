@@ -90,7 +90,6 @@ struct ParkingLotDetailView: View {
                 searchOverlay
             }
         }
-        .navigationTitle("Parking Lot 3")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -107,6 +106,12 @@ struct ParkingLotDetailView: View {
             if newValue {
                 resetView()
                 appSettings.shouldResetParkingData = false
+            }
+        }
+        .onChange(of: appSettings.navigateToSpot) { _, newValue in
+            if let spotNum = newValue {
+                navigateToSpot(spotNum)
+                appSettings.navigateToSpot = nil
             }
         }
         .onAppear {
@@ -157,9 +162,10 @@ struct ParkingLotDetailView: View {
         lastRotation = .zero
     }
 
-    private func navigateToSpot() {
-        guard let spotNum = Int(searchText),
-              let position = ParkingLotMap.position(forSpotNumber: spotNum) else { return }
+    private func navigateToSpot(_ spotNum: Int? = nil) {
+        let target = spotNum ?? Int(searchText)
+        guard let targetSpot = target,
+              let position = ParkingLotMap.position(forSpotNumber: targetSpot) else { return }
 
         let spotCenter = ParkingLotMap.centerPoint(forRow: position.row, col: position.col)
 
@@ -188,6 +194,8 @@ struct ParkingLotDetailView: View {
             isSearching = false
             searchText = ""
         }
+
+        selectedSpotNumber = targetSpot
     }
 
     // MARK: - Map Layer (Full-Screen)

@@ -23,7 +23,7 @@ import {
 import { getMockParkingData } from "./mock-data";
 import { DAY_PROFILES, interpolateProfile } from "./occupancy-profiles";
 import { isRealSpotPosition } from "./sensor-config";
-import { spotNumberForPosition } from "./utils";
+import { spotNumberForPosition, getParkingLotLocalTime } from "./utils";
 import { getRealSpotsData, REAL_SPOTS } from "./sensor";
 
 interface SimulationState {
@@ -36,6 +36,66 @@ interface SimulationState {
 }
 
 const GLOBAL_KEY = "__parkingSimulation" as const;
+const USABLE_SPOTS =
+  TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length;
+
+/** Immediately snap occupancy to the current day/time target if it's far off.
+ *  Called on every API request so it self-corrects even when HMR preserves stale state. */
+function correctOccupancyIfNeeded(state: SimulationState): void {
+  const { hour, dayOfWeek } = getParkingLotLocalTime();
+  const profile = DAY_PROFILES[dayOfWeek];
+  const targetOccupied = Math.round(interpolateProfile(profile, hour) * USABLE_SPOTS);
+
+  let currentOccupied = 0;
+  for (const rowIdx of PARKING_ROW_INDICES) {
+    for (let col = 0; col < SPOTS_PER_ROW; col++) {
+      if (state.data.grid[rowIdx][col].status === SpotStatus.Occupied) currentOccupied++;
+    }
+  }
+
+  const diff = targetOccupied - currentOccupied;
+  if (Math.abs(diff) <= 15) return; // close enough, let the tick handle it
+
+  const candidates: { row: number; col: number }[] = [];
+  for (const rowIdx of PARKING_ROW_INDICES) {
+    for (let col = 0; col < SPOTS_PER_ROW; col++) {
+      if (isRealSpotPosition(rowIdx, col)) continue;
+      const spot = state.data.grid[rowIdx][col];
+      if (spot.status === SpotStatus.NotASpot) continue;
+      if (diff > 0 && spot.status !== SpotStatus.Occupied) {
+        candidates.push({ row: rowIdx, col });
+      } else if (diff < 0 && spot.status === SpotStatus.Occupied) {
+        candidates.push({ row: rowIdx, col });
+      }
+    }
+  }
+
+  // Shuffle candidates for random selection
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
+  const nowStr = new Date().toISOString();
+  for (const { row, col } of candidates.slice(0, Math.abs(diff))) {
+    const spot = state.data.grid[row][col];
+    state.data.grid[row][col] = diff > 0
+      ? { status: SpotStatus.Occupied, isHandicap: spot.isHandicap }
+      : { status: spot.isHandicap ? SpotStatus.Handicap : SpotStatus.Available, isHandicap: spot.isHandicap };
+
+    const sid = spotNumberForPosition(row, col);
+    if (sid && state.data.sensors[sid]) {
+      const isOcc = state.data.grid[row][col].status === SpotStatus.Occupied;
+      state.data.sensors[sid] = {
+        ...state.data.sensors[sid],
+        objectDetected: isOcc,
+        lastUpdated: nowStr,
+        distanceMm: isOcc ? Math.floor(50 + Math.random() * 350) : Math.floor(1200 + Math.random() * 800),
+        consecutiveDetections: isOcc ? Math.floor(3 + Math.random() * 7) : 0,
+      };
+    }
+  }
+}
 
 function getOrCreateSimulation(): SimulationState {
   const g = globalThis as unknown as Record<string, SimulationState | undefined>;
@@ -65,8 +125,6 @@ function getOrCreateSimulation(): SimulationState {
 function startSimulation(state: SimulationState): void {
   if (state.simInterval) return; // already running
 
-  const usableSpots =
-    TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length;
   const totalPRows = PARKING_ROW_INDICES.length;
 
   // --- Main simulation tick (every 3.5s) ---
@@ -75,13 +133,11 @@ function startSimulation(state: SimulationState): void {
     const newSensors = { ...state.data.sensors };
     const newEvents: ActivityEvent[] = [];
 
-    // Day profile targeting
-    const now = new Date();
-    const hour = now.getHours() + now.getMinutes() / 60;
-    const dayOfWeek = now.getDay();
+    // Day profile targeting — use local timezone, not server UTC
+    const { hour, dayOfWeek } = getParkingLotLocalTime();
     const profile = DAY_PROFILES[dayOfWeek];
     const targetFraction = interpolateProfile(profile, hour);
-    const targetOccupied = Math.round(targetFraction * usableSpots);
+    const targetOccupied = Math.round(targetFraction * USABLE_SPOTS);
 
     // Count current occupied
     let currentOccupied = 0;
@@ -95,9 +151,11 @@ function startSimulation(state: SimulationState): void {
     const needMore = currentOccupied < targetOccupied;
     const diff = Math.abs(currentOccupied - targetOccupied);
     const numChanges =
-      diff > 20
-        ? 3 + Math.floor(Math.random() * 3)
-        : 1 + Math.floor(Math.random() * 3);
+      diff > 50
+        ? 8 + Math.floor(Math.random() * 5)
+        : diff > 20
+          ? 3 + Math.floor(Math.random() * 3)
+          : 1 + Math.floor(Math.random() * 3);
 
     // Weighted random pick: front-left spots are more desirable
     const pickWeightedSpot = (preferFront: boolean) => {
@@ -169,6 +227,8 @@ function startSimulation(state: SimulationState): void {
         if (!sid || !newSensors[sid]) continue;
         if (!newSensors[sid].sensorOnline) continue;
         const isOccupied = newGrid[rowIdx][col].status === SpotStatus.Occupied;
+        const wasOccupied = newSensors[sid].objectDetected;
+        const statusChanged = isOccupied !== wasOccupied;
         newSensors[sid] = {
           ...newSensors[sid],
           distanceMm: isOccupied
@@ -176,7 +236,7 @@ function startSimulation(state: SimulationState): void {
             : Math.floor(1200 + Math.random() * 800),
           objectDetected: isOccupied,
           consecutiveDetections: isOccupied ? Math.floor(3 + Math.random() * 7) : 0,
-          lastUpdated: new Date().toISOString(),
+          lastUpdated: statusChanged ? new Date().toISOString() : newSensors[sid].lastUpdated,
         };
       }
     }
@@ -225,9 +285,13 @@ function startSimulation(state: SimulationState): void {
 
 /**
  * Get the current simulation state. Auto-starts the simulation on first call.
+ * Also self-corrects occupancy if it has drifted far from the day/time target —
+ * this handles HMR in dev mode where globalThis persists but the bulk catch-up
+ * in startSimulation never runs again.
  */
 export function getSimulationState() {
   const state = getOrCreateSimulation();
+  correctOccupancyIfNeeded(state);
   return {
     grid: state.data.grid,
     sensors: state.data.sensors,

@@ -21,7 +21,7 @@ import {
   GRASS_POSITIONS,
   TOTAL_NUMBERED_SPOTS,
 } from "./constants";
-import { spotNumberForPosition, seededRandom } from "./utils";
+import { spotNumberForPosition, seededRandom, getParkingLotLocalTime } from "./utils";
 import { REAL_SPOTS } from "./sensor-config";
 
 const UNUSABLE_COUNT = NOT_A_SPOT_POSITIONS.length + GRASS_POSITIONS.length;
@@ -29,28 +29,24 @@ const UNUSABLE_COUNT = NOT_A_SPOT_POSITIONS.length + GRASS_POSITIONS.length;
 /** Returns a realistic occupancy fraction based on current day/time.
  *  Simplified version of the full day profiles used in the context. */
 function getRealisticFillRate(): number {
-  const now = new Date();
-  const day = now.getDay();
-  const hour = now.getHours() + now.getMinutes() / 60;
+  const { hour, dayOfWeek: day } = getParkingLotLocalTime();
 
-  // Peak occupancy fraction by day: Mon/Wed ~93-96%, Tue/Thu ~83%, Fri ~84%, Sat ~22%, Sun ~12%
-  const peakByDay = [0.12, 0.93, 0.83, 0.96, 0.83, 0.84, 0.22];
+  // Peak occupancy fraction by day
+  const peakByDay = [0.10, 0.97, 0.92, 0.99, 0.92, 0.88, 0.22];
   const peak = peakByDay[day];
 
-  // Time-of-day curve (fraction of peak): ramps 7-10, peaks 10-13, drops 13-18
+  // Time-of-day curve: ramps 7-10am, plateau 10am-3pm, gradual drop 3-7pm
   let timeFactor: number;
   if (hour < 6) timeFactor = 0.03;
   else if (hour < 7) timeFactor = 0.05;
-  else if (hour < 8) timeFactor = 0.25;
-  else if (hour < 9) timeFactor = 0.55;
-  else if (hour < 10) timeFactor = 0.80;
-  else if (hour < 13) timeFactor = 1.0;
-  else if (hour < 14) timeFactor = 0.90;
-  else if (hour < 15) timeFactor = 0.75;
-  else if (hour < 16) timeFactor = 0.55;
-  else if (hour < 17) timeFactor = 0.35;
-  else if (hour < 18) timeFactor = 0.20;
-  else if (hour < 20) timeFactor = 0.10;
+  else if (hour < 8) timeFactor = 0.32;
+  else if (hour < 9) timeFactor = 0.65;
+  else if (hour < 10) timeFactor = 0.88;
+  else if (hour < 15) timeFactor = 1.0;   // extended peak: 10 AM – 3 PM
+  else if (hour < 16) timeFactor = 0.82;
+  else if (hour < 17) timeFactor = 0.56;
+  else if (hour < 18) timeFactor = 0.37;
+  else if (hour < 20) timeFactor = 0.20;
   else timeFactor = 0.05;
 
   return peak * timeFactor;

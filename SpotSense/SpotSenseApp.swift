@@ -44,6 +44,8 @@ class AppSettings: ObservableObject {
         }
     }
     @Published var shouldResetParkingData: Bool = false
+    @Published var selectedTab: Int = 0
+    @Published var navigateToSpot: Int? = nil
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue

@@ -8,27 +8,33 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @EnvironmentObject var appSettings: AppSettings
+
     var body: some View {
-        TabView {
+        TabView(selection: $appSettings.selectedTab) {
             DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "chart.bar.fill")
                 }
+                .tag(0)
 
             ParkingLotSelectionView()
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
                 }
+                .tag(1)
 
             FavoritesView()
                 .tabItem {
                     Label("Favorites", systemImage: "heart.fill")
                 }
+                .tag(2)
 
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
+                .tag(3)
         }
     }
 }

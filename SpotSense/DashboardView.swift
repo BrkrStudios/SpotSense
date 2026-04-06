@@ -25,9 +25,6 @@ struct DashboardView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
-                        Text("Parking Lot 3")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                     }
                     .padding(.horizontal)
 

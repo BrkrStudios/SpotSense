@@ -98,6 +98,11 @@ struct FavoritesView: View {
                         .cornerRadius(8)
                 }
                 .padding(.vertical, 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    appSettings.navigateToSpot = spotNum
+                    appSettings.selectedTab = 1
+                }
             }
             .onDelete { indexSet in
                 for idx in indexSet {
