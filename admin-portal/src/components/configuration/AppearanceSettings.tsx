@@ -7,7 +7,7 @@ const themeOptions: { value: Theme; label: string; icon: string }[] = [
   { value: "light", label: "Light", icon: "M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
 ];
 
-const accentOptions: AccentColor[] = ["blue", "violet", "green", "orange"];
+const accentOptions: AccentColor[] = ["blue", "violet", "pink", "green", "orange"];
 const densityOptions: { value: Density; label: string }[] = [
   { value: "comfortable", label: "Comfortable" },
   { value: "compact", label: "Compact" },

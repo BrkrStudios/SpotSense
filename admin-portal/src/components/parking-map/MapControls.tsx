@@ -99,7 +99,7 @@ export default function MapControls({
             disabled={!isValid}
             className="px-2 py-1 text-xs rounded font-medium transition-colors"
             style={{
-              backgroundColor: isValid ? "#3366E6" : "var(--surface)",
+              backgroundColor: isValid ? "var(--accent)" : "var(--surface)",
               color: isValid ? "white" : "var(--text-secondary)",
             }}
           >

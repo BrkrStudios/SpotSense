@@ -76,8 +76,8 @@ export default function Sidebar() {
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
                 style={{
-                  backgroundColor: isActive ? "var(--surface)" : "transparent",
-                  color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                  backgroundColor: isActive ? "var(--accent-soft)" : "transparent",
+                  color: isActive ? "var(--accent)" : "var(--text-secondary)",
                 }}
               >
                 <svg

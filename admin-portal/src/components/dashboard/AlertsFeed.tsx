@@ -24,7 +24,7 @@ export default function AlertsFeed({ alerts }: AlertsFeedProps) {
         <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
           Recent Alerts
         </h3>
-        <Link href="/alerts" className="text-xs hover:underline" style={{ color: "#3B82F6" }}>
+        <Link href="/alerts" className="text-xs hover:underline" style={{ color: "var(--accent)" }}>
           View All &rarr;
         </Link>
       </div>

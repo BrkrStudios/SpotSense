@@ -257,7 +257,7 @@ export default function OccupancyChart({ data, serverTime }: OccupancyChartProps
             x2={nowX}
             y1={padding.top}
             y2={padding.top + chartH}
-            stroke="#3366E6"
+            stroke="var(--accent)"
             strokeWidth="1"
             strokeDasharray="4 3"
           />
@@ -267,7 +267,7 @@ export default function OccupancyChart({ data, serverTime }: OccupancyChartProps
             textAnchor="middle"
             fontSize="9"
             fontWeight="600"
-            fill="#3366E6"
+            fill="var(--accent)"
           >
             NOW
           </text>

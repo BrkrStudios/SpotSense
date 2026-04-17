@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 
 export type Theme = "dark" | "light";
 export type Density = "comfortable" | "compact";
-export type AccentColor = "blue" | "violet" | "green" | "orange";
+export type AccentColor = "blue" | "violet" | "pink" | "green" | "orange";
 
 export interface AlertPrefs {
   soundEnabled: boolean;
@@ -45,6 +45,7 @@ const DEFAULTS: Settings = {
 const ACCENTS: Record<AccentColor, string> = {
   blue: "#3366E6",
   violet: "#8B5CF6",
+  pink: "#EC4899",
   green: "#33BF4D",
   orange: "#F97316",
 };
@@ -68,7 +69,11 @@ function applyToDocument(settings: Settings) {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = settings.theme;
   document.documentElement.dataset.density = settings.density;
-  document.documentElement.style.setProperty("--accent", ACCENTS[settings.accent]);
+  const hex = ACCENTS[settings.accent];
+  const root = document.documentElement.style;
+  root.setProperty("--accent", hex);
+  root.setProperty("--accent-soft", hex + "22"); // ~13% alpha chip bg
+  root.setProperty("--accent-medium", hex + "55"); // ~33% alpha ring/border
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {

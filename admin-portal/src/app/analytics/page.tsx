@@ -122,9 +122,9 @@ export default function AnalyticsPage() {
           <StatCard
             label="Avg Time Parked"
             value={avgTimeParked}
-            color="#3B82F6"
+            color="var(--accent)"
             icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v6l3 3" />
               </svg>

@@ -58,7 +58,7 @@ export default function AlertItem({ alert, onResolve }: AlertItemProps) {
             <Link
               href={`/sensors/${alert.spotId}`}
               className="text-xs hover:underline"
-              style={{ color: "#3B82F6" }}
+              style={{ color: "var(--accent)" }}
             >
               Spot {alert.spotId}
             </Link>
