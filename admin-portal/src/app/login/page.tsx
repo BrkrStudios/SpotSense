@@ -1,11 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Stage = "credentials" | "two_factor";
 
 export default function LoginPage() {
+  // useSearchParams() needs a Suspense boundary during prerender.
+  return (
+    <Suspense fallback={<LoginSkeleton />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginSkeleton() {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor: "var(--asphalt)" }}
+    />
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const nextPath = params.get("next") ?? "/";
