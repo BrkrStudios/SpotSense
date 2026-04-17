@@ -6,7 +6,6 @@ import {
   ParkingStats,
   Alert,
   OccupancyDataPoint,
-  SystemConfiguration,
   DailyOccupancyProfile,
   WeeklyStats,
 } from "./types";
@@ -449,13 +448,3 @@ export function computeWeeklyStats(data: DailyOccupancyProfile[]): WeeklyStats {
   };
 }
 
-export function getMockConfig(): SystemConfiguration {
-  return {
-    pollingIntervalMs: 1000,
-    cameraThreshold: 3,
-    spotDesignations: HANDICAP_POSITIONS.map(([r, c]) => ({
-      spotId: spotNumberForPosition(r, c)!,
-      designation: "handicap" as const,
-    })),
-  };
-}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Header from "@/components/layout/Header";
 import StatCard from "@/components/dashboard/StatCard";
 import OccupancyChart from "@/components/dashboard/OccupancyChart";
@@ -12,8 +12,13 @@ import BusiestSpots from "@/components/analytics/BusiestSpots";
 import SensorHealthRing from "@/components/analytics/SensorHealthRing";
 import CameraSavingsCard from "@/components/analytics/CameraSavingsCard";
 import { useParkingData } from "@/context/ParkingDataContext";
-import { generateHistoricalData, computeWeeklyStats, getMockConfig } from "@/lib/mock-data";
+import { generateHistoricalData, computeWeeklyStats } from "@/lib/mock-data";
 import { DAY_NAMES } from "@/lib/occupancy-profiles";
+
+// Fixed threshold for Camera Power Savings estimate.
+// Previously configurable via /api/config; now baked in since the config page
+// no longer exposes polling/threshold controls.
+const CAMERA_THRESHOLD_DEFAULT = 5;
 
 export default function AnalyticsPage() {
   const { occupancyHistory, serverTime, stats, heatmapData, tickCount, occupancyPercent, avgTimeParked } =
@@ -42,15 +47,6 @@ export default function AnalyticsPage() {
     ? `${Math.floor(today.peakHour) % 12 || 12}:${String(Math.round((today.peakHour % 1) * 60)).padStart(2, "0")} ${today.peakHour < 12 ? "AM" : "PM"}`
     : "--";
 
-  const [cameraThreshold, setCameraThreshold] = useState<number>(getMockConfig().cameraThreshold);
-  useEffect(() => {
-    fetch("/api/config")
-      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-      .then((data) => {
-        if (typeof data.cameraThreshold === "number") setCameraThreshold(data.cameraThreshold);
-      })
-      .catch(() => {});
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -169,7 +165,7 @@ export default function AnalyticsPage() {
         {/* Sensor health + Camera savings */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SensorHealthRing online={stats.sensorsOnline} offline={stats.sensorsOffline} />
-          <CameraSavingsCard cameraThreshold={cameraThreshold} />
+          <CameraSavingsCard cameraThreshold={CAMERA_THRESHOLD_DEFAULT} />
         </div>
 
         {/* Weekly overlay chart */}

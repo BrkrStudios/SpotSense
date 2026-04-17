@@ -41,17 +41,6 @@ export interface ParkingStats {
   sensorsOffline: number;
 }
 
-export interface SystemConfiguration {
-  pollingIntervalMs: number;
-  cameraThreshold: number;
-  spotDesignations: SpotDesignation[];
-}
-
-export interface SpotDesignation {
-  spotId: number;
-  designation: "normal" | "handicap" | "out_of_service" | "reserved";
-}
-
 export interface Alert {
   id: string;
   timestamp: string;
