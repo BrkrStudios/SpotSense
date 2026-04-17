@@ -5,6 +5,14 @@ interface HeaderProps {
   subtitle?: string;
 }
 
+const services: { label: string; color: string }[] = [
+  { label: "SpotSense", color: "#22C55E" },
+  { label: "Firebase", color: "#22C55E" },
+  { label: "Railway", color: "#22C55E" },
+  { label: "Pi 0", color: "#22C55E" },
+  { label: "API", color: "#22C55E" },
+];
+
 export default function Header({ title, subtitle }: HeaderProps) {
   return (
     <header
@@ -28,28 +36,24 @@ export default function Header({ title, subtitle }: HeaderProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Pi Status indicators */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
+        {services.map((s) => (
+          <div key={s.label} className="flex items-center gap-1.5">
             <span
-              className="text-xs font-medium"
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{
+                backgroundColor: s.color,
+                boxShadow: `0 0 6px ${s.color}aa`,
+              }}
+            />
+            <span
+              className="text-[11px] md:text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              Pi 0
+              {s.label}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span
-              className="text-xs font-medium"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              API
-            </span>
-          </div>
-        </div>
+        ))}
       </div>
     </header>
   );

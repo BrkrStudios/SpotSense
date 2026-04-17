@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Header from "@/components/layout/Header";
 import AlertFilters from "@/components/alerts/AlertFilters";
 import AlertItem from "@/components/alerts/AlertItem";
 import { useParkingData } from "@/context/ParkingDataContext";
+import { useSettings } from "@/context/SettingsContext";
 import { Alert } from "@/lib/types";
 
 type Severity = "all" | Alert["severity"];
@@ -12,9 +13,14 @@ type AlertType = "all" | Alert["type"];
 
 export default function AlertsPage() {
   const { alerts, resolveAlert } = useParkingData();
+  const { settings } = useSettings();
   const [severity, setSeverity] = useState<Severity>("all");
   const [type, setType] = useState<AlertType>("all");
-  const [showResolved, setShowResolved] = useState(false);
+  const [showResolved, setShowResolved] = useState(settings.alerts.showResolvedByDefault);
+
+  useEffect(() => {
+    setShowResolved(settings.alerts.showResolvedByDefault);
+  }, [settings.alerts.showResolvedByDefault]);
 
   const counts = useMemo(() => {
     const c = { total: 0, critical: 0, warning: 0, info: 0, resolved: 0 };
@@ -33,12 +39,17 @@ export default function AlertsPage() {
     return alerts
       .filter((a) => {
         if (!showResolved && a.resolved) return false;
+        // Global severity visibility from settings
+        if (a.severity === "critical" && !settings.alerts.showCritical) return false;
+        if (a.severity === "warning" && !settings.alerts.showWarning) return false;
+        if (a.severity === "info" && !settings.alerts.showInfo) return false;
+        // Active pill filter — strict equality
         if (severity !== "all" && a.severity !== severity) return false;
         if (type !== "all" && a.type !== type) return false;
         return true;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [alerts, severity, type, showResolved]);
+  }, [alerts, severity, type, showResolved, settings.alerts]);
 
   return (
     <div className="min-h-screen flex flex-col">

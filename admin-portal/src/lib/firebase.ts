@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
+import { getFirestore, Firestore, FieldValue } from "firebase-admin/firestore";
+import { REAL_SPOTS } from "./sensor-config";
 import path from "path";
 
 let app: App;
@@ -91,4 +92,52 @@ export async function fetchLatestReadings(
 
   await Promise.all(queries);
   return results;
+}
+
+export interface DeviceConfig {
+  neededHits: number;
+}
+
+/**
+ * Read config from the first real device as the canonical global config.
+ */
+export async function readGlobalConfig(): Promise<DeviceConfig | null> {
+  if (REAL_SPOTS.length === 0) return null;
+  const firestore = getDb();
+  try {
+    const doc = await firestore
+      .collection("device_config")
+      .doc(REAL_SPOTS[0].deviceId)
+      .get();
+    if (!doc.exists) return null;
+    const data = doc.data()!;
+    return {
+      neededHits: data.neededHits ?? 5,
+    };
+  } catch (err) {
+    console.error("[Firebase] Error reading global config:", err);
+    return null;
+  }
+}
+
+/**
+ * Write config to all real devices in Firestore.
+ */
+export async function writeGlobalConfig(config: DeviceConfig): Promise<void> {
+  const firestore = getDb();
+  await Promise.all(
+    REAL_SPOTS.map((spot) =>
+      firestore
+        .collection("device_config")
+        .doc(spot.deviceId)
+        .set(
+          {
+            neededHits: config.neededHits,
+            lastUpdatedBy: "admin-portal",
+            lastUpdatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        )
+    )
+  );
 }

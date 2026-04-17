@@ -140,14 +140,18 @@ export function ParkingDataProvider({ children }: { children: ReactNode }) {
           const key = `occupancy_high`;
           if (!keys.has(key)) {
             keys.add(key);
-            newAlerts.push({ id: key, timestamp: now, severity: "critical", message: `Lot at ${occPct}% capacity — nearing full`, type: "occupancy_threshold" });
+            newAlerts.push({ id: `${key}_${Date.now()}`, timestamp: now, severity: "critical", message: `Lot at ${occPct}% capacity — nearing full`, type: "occupancy_threshold" });
           }
         } else {
           keys.delete("occupancy_high");
         }
 
         if (newAlerts.length > 0) {
-          setAlerts((prev) => [...newAlerts, ...prev].slice(0, 100));
+          setAlerts((prev) => {
+            const existingIds = new Set(prev.map((a) => a.id));
+            const deduped = newAlerts.filter((a) => !existingIds.has(a.id));
+            return [...deduped, ...prev].slice(0, 100);
+          });
         }
       } catch {
         // Will retry next interval
@@ -296,13 +300,15 @@ function computeAvgTimeParked(serverTime: Date | null): string {
   } else if (hour < 11) {
     avgMin = 55 + (hour - 9) * 25; // 55-105 min, mix of early + new
   } else if (hour < 14) {
-    avgMin = 105 + (hour - 11) * 20; // 105-165 min, many have been there a while
+    avgMin = 105 + (hour - 11) * 25; // 105-180 min
   } else if (hour < 17) {
-    avgMin = 165 + (hour - 14) * 25; // 165-240 min, remaining cars parked long
-  } else if (hour < 20) {
-    avgMin = 120 + (hour - 17) * (-15); // evening classes, shorter stays
+    avgMin = 180 + (hour - 14) * 30; // 180-270 min, cars sticking through afternoon labs
+  } else if (hour < 19) {
+    avgMin = 270 + (hour - 17) * (-20); // 270-230 min, still mostly long-stay cars
+  } else if (hour < 21) {
+    avgMin = 90 + (hour - 19) * (-10); // evening-class arrivals, shorter stays
   } else {
-    avgMin = 75;
+    avgMin = 60;
   }
 
   // Weekend adjustment — shorter avg stays

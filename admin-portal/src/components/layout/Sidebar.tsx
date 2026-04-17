@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSettings } from "@/context/SettingsContext";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" },
@@ -16,6 +17,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { settings } = useSettings();
 
   return (
     <>
@@ -94,17 +96,16 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              Demo Mode
-            </span>
+        {settings.showLotName && (
+          <div className="px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Parking Lot 3
+              </span>
+            </div>
           </div>
-          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
-            Parking Lot 3
-          </p>
-        </div>
+        )}
       </aside>
     </>
   );

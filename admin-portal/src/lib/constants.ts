@@ -7,16 +7,17 @@ export const ROAD_WIDTH = 56;
 export const SPOTS_PER_ROW = 22;
 export const TOTAL_ROWS = 22;
 
-// Colors — exact RGB values from iOS ContentView.swift
+// Colors — theme-aware tokens resolve to CSS variables set in globals.css.
+// Status colors stay fixed so occupancy/handicap semantics read the same on any theme.
 export const COLORS = {
-  asphalt: "#2E2E33", // Color(red: 0.18, green: 0.18, blue: 0.20)
-  line: "#D9D9CC", // Color(red: 0.85, green: 0.85, blue: 0.80)
-  lane: "#38383D", // Color(red: 0.22, green: 0.22, blue: 0.24)
-  handicap: "#3366E6", // Color(red: 0.2, green: 0.4, blue: 0.9)
-  available: "#33BF4D", // Color(red: 0.2, green: 0.75, blue: 0.3)
-  occupied: "#D92626", // Color(red: 0.85, green: 0.15, blue: 0.15)
-  grass: "#2D5A1E",
-  road: "#38383D",
+  asphalt: "var(--map-asphalt)",
+  line: "var(--map-line)",
+  lane: "var(--map-lane)",
+  handicap: "#3366E6",
+  available: "#33BF4D",
+  occupied: "#D92626",
+  grass: "var(--grass)",
+  road: "var(--map-lane)",
 } as const;
 
 // Grid structure

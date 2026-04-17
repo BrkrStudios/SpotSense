@@ -51,22 +51,31 @@ export default function AlertFilters({
               ? counts.total
               : counts[opt.value as keyof typeof counts] ?? 0;
 
+          const bg =
+            opt.value === "all"
+              ? isActive
+                ? "var(--surface)"
+                : "transparent"
+              : isActive
+                ? opt.color + "22"
+                : "transparent";
           return (
             <button
               key={opt.value}
               onClick={() => onSeverityChange(opt.value)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{
-                backgroundColor: isActive ? "var(--surface)" : "transparent",
+                backgroundColor: bg,
                 color: isActive ? opt.color : "var(--text-secondary)",
-                border: isActive ? "1px solid var(--border)" : "1px solid transparent",
+                border: `1px solid ${isActive && opt.value !== "all" ? opt.color + "66" : isActive ? "var(--border)" : "transparent"}`,
+                boxShadow: isActive && opt.value !== "all" ? `0 0 0 2px ${opt.color}22` : "none",
               }}
             >
               {opt.label}
               <span
                 className="text-[10px] px-1.5 py-0.5 rounded-full"
                 style={{
-                  backgroundColor: isActive ? opt.color + "22" : "var(--surface)",
+                  backgroundColor: isActive ? opt.color + "33" : "var(--surface)",
                   color: isActive ? opt.color : "var(--text-secondary)",
                 }}
               >

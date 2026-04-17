@@ -1,18 +1,48 @@
 @import "tailwindcss";
 
-:root {
+:root,
+:root[data-theme="dark"] {
   --asphalt: #2E2E33;
   --line: #D9D9CC;
   --lane: #38383D;
   --handicap: #3366E6;
   --available: #33BF4D;
   --occupied: #D92626;
+  --grass: #2D5A1E;
   --sidebar: #1A1A1F;
   --surface: #232328;
   --surface-hover: #2A2A30;
   --text-primary: #F0F0F0;
   --text-secondary: #9A9AA0;
   --border: #3A3A42;
+  --accent: #3366E6;
+
+  /* Parking map tokens — match the page theme */
+  --map-asphalt: #2E2E33;
+  --map-line: #D9D9CC;
+  --map-lane: #38383D;
+}
+
+:root[data-theme="light"] {
+  --asphalt: #F2F2F4;
+  --line: #8C8C94;
+  --lane: #E4E4E8;
+  --handicap: #3366E6;
+  --available: #16A34A;
+  --occupied: #DC2626;
+  --grass: #5CA23E;
+  --sidebar: #FFFFFF;
+  --surface: #F6F6F9;
+  --surface-hover: #ECECF1;
+  --text-primary: #15151B;
+  --text-secondary: #5E5E6A;
+  --border: #DCDCE4;
+  --accent: #3366E6;
+
+  /* Parking map stays realistic — dark asphalt with bright white lane markings */
+  --map-asphalt: #5A5E63;
+  --map-line: #FFFFFF;
+  --map-lane: #4A4E53;
 }
 
 html, body {
@@ -20,9 +50,16 @@ html, body {
   margin: 0;
   background: var(--asphalt);
   color: var(--text-primary);
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* Compact density reduces vertical paddings on common containers */
+:root[data-density="compact"] .density-aware {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
