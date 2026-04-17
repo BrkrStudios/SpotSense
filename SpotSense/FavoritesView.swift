@@ -1,21 +1,28 @@
 //
 //  FavoritesView.swift
-//  SpotSense
+//  SpotSense Senior Project
 //
-//  List of favorited parking spots with live status.
+//  Created by Xander Angulo, Maden Edaugal on 1/4/26.
+//
+//  Tab that lists every spot the user has favorited and shows its live
+//  status (available / occupied), section, and whether it's backed by a
+//  hardware sensor. Tapping a row jumps to the Map tab and flies the
+//  camera to that spot. Swipe-to-delete removes the favorite.
 //
 
 import SwiftUI
 
+/// List view backing the "Favorites" tab.
 struct FavoritesView: View {
-    @EnvironmentObject var parkingLot: ParkingLotViewModel
-    @EnvironmentObject var favoritesManager: FavoritesManager
-    @EnvironmentObject var appSettings: AppSettings
 
+    @EnvironmentObject var parkingLot:        ParkingLotViewModel
+    @EnvironmentObject var favoritesManager:  FavoritesManager
+    @EnvironmentObject var appSettings:       AppSettings
+
+    /// Favorites sorted by spot number for stable ordering.
     private var sortedFavorites: [Int] {
         favoritesManager.favorites.sorted()
     }
-
     var body: some View {
         NavigationStack {
             Group {
@@ -33,6 +40,7 @@ struct FavoritesView: View {
 
     // MARK: - Empty State
 
+    /// Placeholder shown when the favorites set is empty.
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "heart.slash")
@@ -40,7 +48,7 @@ struct FavoritesView: View {
                 .foregroundColor(.secondary.opacity(0.5))
             Text("No Favorites Yet")
                 .font(.title3.weight(.semibold))
-            Text("Tap any spot on the map to add it to your favorites.")
+            Text("Tap any spot on the map to add it to favorites.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -115,27 +123,32 @@ struct FavoritesView: View {
 
     // MARK: - Helpers
 
+    /// Bag of derived flags used by a single row in the list.
     private struct SpotInfo {
         let isAvailable: Bool
-        let isHandicap: Bool
-        let hasSensor: Bool
-        let section: String
+        let isHandicap:  Bool
+        let hasSensor:   Bool
+        let section:     String
     }
 
+    /// Looks up the live state for the given spot number from the parking
+    /// view model and bundles the bits needed for the row layout.
     private func spotDetails(_ spotNum: Int) -> SpotInfo {
         guard let pos = ParkingLotMap.position(forSpotNumber: spotNum) else {
             return SpotInfo(isAvailable: false, isHandicap: false, hasSensor: false, section: "?")
         }
-        let spot = parkingLot.map.map[pos.row][pos.col]
+        let spot    = parkingLot.map.map[pos.row][pos.col]
         let section = LotSection.section(forSpotNumber: spotNum)?.rawValue ?? "?"
         return SpotInfo(
             isAvailable: spot.isAvailable,
-            isHandicap: spot.isHandicap,
-            hasSensor: spot.hasSensor,
-            section: section
+            isHandicap:  spot.isHandicap,
+            hasSensor:   spot.hasSensor,
+            section:     section
         )
     }
 }
+
+// MARK: - Preview
 
 #Preview {
     FavoritesView()

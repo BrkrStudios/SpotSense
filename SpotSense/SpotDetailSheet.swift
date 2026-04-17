@@ -1,17 +1,34 @@
 //
 //  SpotDetailSheet.swift
-//  SpotSense
+//  SpotSense Senior Project
 //
-//  Bottom sheet shown when a user taps a parking spot on the map.
+//  Created by Xander Angulo, Maden Edaugal on 1/4/26.
+//
+//  Bottom sheet presented when a spot is tapped on the Map tab. Shows a
+//  big status badge, the spot number and section, any handicap indicator,
+//  a time-since-last-update readout, and controls for favoriting and
+//  sharing the spot.
 //
 
 import SwiftUI
 
+/// Bottom sheet UI for a single tapped spot.
 struct SpotDetailSheet: View {
+
+    /// Spot number (1…308) of the tapped cell.
     let spotNumber: Int
+
+    /// Snapshot of the spot at the moment the sheet opened. Status text
+    /// stays stable while the sheet is visible even if the underlying poll
+    /// updates the live model.
     let spot: ParkingSpot
+
     @EnvironmentObject var favoritesManager: FavoritesManager
+
+    /// Drives a one-shot scale-in animation for the status badge.
     @State private var animateIn = false
+
+    // MARK: Derived
 
     private var section: String {
         LotSection.section(forSpotNumber: spotNumber)?.rawValue ?? "?"
@@ -21,6 +38,8 @@ struct SpotDetailSheet: View {
         favoritesManager.isFavorite(spotNumber)
     }
 
+    /// Green for available spots, red for occupied. Used by the badge,
+    /// status pill, and info tiles so the sheet reads at a glance.
     private var statusColor: Color {
         spot.isAvailable ? .green : .red
     }
@@ -43,11 +62,44 @@ struct SpotDetailSheet: View {
 
                 // Favorite button
                 favoriteButton
+
+                // Share button
+                shareButton
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
         .onAppear { withAnimation(.easeOut(duration: 0.4)) { animateIn = true } }
+    }
+
+    // MARK: - Share Button
+
+    /// Plain-text payload sent through the iOS share sheet. Includes the
+    /// spot number, section, current status, and a handicap qualifier.
+    private var shareText: String {
+        let statusWord: String
+        if spot.isHandicap {
+            statusWord = spot.isAvailable ? "is available (handicap)" : "is occupied (handicap)"
+        } else {
+            statusWord = spot.isAvailable ? "is available" : "is occupied"
+        }
+        return "Spot \(spotNumber) (Section \(section)) \(statusWord) right now — SpotSense"
+    }
+
+    private var shareButton: some View {
+        ShareLink(item: shareText) {
+            HStack(spacing: 10) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.body.weight(.semibold))
+                Text("Share Spot")
+                    .font(.body.weight(.medium))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color(.secondarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Header Card
@@ -164,11 +216,15 @@ struct SpotDetailSheet: View {
 
     // MARK: - Helpers
 
+    /// Converts an ISO-8601 timestamp from the API into a human-friendly
+    /// relative string ("3 minutes ago"). Tries the fractional-seconds
+    /// variant first because the backend currently emits both forms.
     private func formatSinceTime(_ isoString: String) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         guard let date = formatter.date(from: isoString) else {
+            // Fallback: same string without the fractional-seconds option.
             let fallback = ISO8601DateFormatter()
             fallback.formatOptions = [.withInternetDateTime]
             guard let date = fallback.date(from: isoString) else {
@@ -179,6 +235,8 @@ struct SpotDetailSheet: View {
         return relativeTime(from: date)
     }
 
+    /// Wraps `RelativeDateTimeFormatter` with the "full" units style
+    /// (e.g. "5 minutes ago" instead of "5m ago").
     private func relativeTime(from date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
@@ -188,11 +246,13 @@ struct SpotDetailSheet: View {
 
 // MARK: - Info Tile
 
+/// Reusable card used in the detail sheet's info grid (status duration +
+/// section). Square layout with an SF Symbol on top and a title/value below.
 struct InfoTile: View {
-    let icon: String
+    let icon:      String
     let iconColor: Color
-    let label: String
-    let value: String
+    let label:     String
+    let value:     String
 
     var body: some View {
         VStack(spacing: 8) {

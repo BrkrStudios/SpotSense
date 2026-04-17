@@ -1,16 +1,29 @@
 //
 //  DashboardView.swift
-//  SpotSense
+//  SpotSense Senior Project
 //
-//  User-facing dashboard: occupancy overview, favorites summary, quick stats.
+//  Created by Xander Angulo, Maden Edaugal on 1/4/26.
+//
+//  Top-level "Dashboard" tab. Shows lot health at a glance:
+//
+//   • A large angular-gradient ring of overall occupancy %.
+//   • A trend chip (rising / falling / steady) under the ring.
+//   • Quick stat cards (Available / Occupied / Handicap).
+//   • Optional Favorites summary card.
+//   • Optional per-section progress bars (A–G).
+//   • Optional connection status / last-sync card.
+//
+//  Most of the section visibility is driven by toggles in `AppSettings`.
 //
 
 import SwiftUI
 
+/// Top-level dashboard tab.
 struct DashboardView: View {
-    @EnvironmentObject var parkingLot: ParkingLotViewModel
+
+    @EnvironmentObject var parkingLot:       ParkingLotViewModel
     @EnvironmentObject var favoritesManager: FavoritesManager
-    @EnvironmentObject var appSettings: AppSettings
+    @EnvironmentObject var appSettings:      AppSettings
 
     var body: some View {
         NavigationStack {
@@ -53,7 +66,10 @@ struct DashboardView: View {
         let percent = parkingLot.occupancyPercent
         let available = parkingLot.availableCount
         let total = parkingLot.map.totalSpotCount()
-        let color: Color = percent > 85 ? .red : percent > 60 ? .orange : .green
+        // Ring blends theme colors at the extremes, with orange in the warning zone.
+        let color: Color = percent > 85
+            ? appSettings.colorTheme.occupiedColor
+            : percent > 60 ? .orange : appSettings.colorTheme.availableColor
 
         return VStack(spacing: 12) {
             ZStack {
@@ -92,8 +108,46 @@ struct DashboardView: View {
             Text("\(available) of \(total) spots available")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+
+            // Trend chip
+            trendChip
         }
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Trend Chip
+
+    private var trendChip: some View {
+        let trend = parkingLot.occupancyTrend
+        let label: String = {
+            switch trend {
+            case .rising:  return "Rising"
+            case .falling: return "Falling"
+            case .steady:  return "Steady"
+            }
+        }()
+        // Themed: rising occupancy uses the theme's "occupied" tone (warning),
+        // falling uses the theme's "available" tone (good news).
+        let chipColor: Color = {
+            switch trend {
+            case .rising:  return appSettings.colorTheme.occupiedColor
+            case .falling: return appSettings.colorTheme.availableColor
+            case .steady:  return .secondary
+            }
+        }()
+
+        return HStack(spacing: 6) {
+            Image(systemName: trend.icon)
+                .font(.system(size: 12, weight: .bold))
+            Text(label)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+        }
+        .foregroundColor(chipColor)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(chipColor.opacity(0.12))
+        .clipShape(Capsule())
+        .accessibilityLabel(trend.description)
     }
 
     // MARK: - Stats Row
@@ -104,13 +158,13 @@ struct DashboardView: View {
                 title: "Available",
                 value: "\(parkingLot.availableCount)",
                 icon: "car.fill",
-                color: .green
+                color: appSettings.colorTheme.availableColor
             )
             DashboardStatCard(
                 title: "Occupied",
                 value: "\(parkingLot.occupiedCount)",
                 icon: "car.side.fill",
-                color: .red
+                color: appSettings.colorTheme.occupiedColor
             )
             if appSettings.showHandicapIndicator {
                 DashboardStatCard(
@@ -129,7 +183,9 @@ struct DashboardView: View {
     private var favoritesSummary: some View {
         let total = favoritesManager.favorites.count
         let available = favoritesManager.availableFavoritesCount(in: parkingLot.map)
-        let color: Color = available > 0 ? .green : .red
+        let color: Color = available > 0
+            ? appSettings.colorTheme.availableColor
+            : appSettings.colorTheme.occupiedColor
 
         return HStack(spacing: 14) {
             ZStack {

@@ -1,12 +1,24 @@
 //
 //  SettingsView.swift
-//  SpotSense
+//  SpotSense Senior Project
 //
-//  Created by Xander Angulo on 2/4/26.
+//  Created by Xander Angulo, Maden Edaugal on 1/4/26.
+//
+//  "Settings" tab. Five sections, top-down:
+//
+//   • Appearance     — light/dark theme + curated color theme picker.
+//   • Notifications  — favorite-spot, lot-full, threshold, test button.
+//   • Map            — map style, handicap toggle, spot numbers, refresh.
+//   • Dashboard      — show/hide cards on the dashboard tab.
+//   • About          — version + privacy policy sheet.
+//
+//  All persistence flows through `AppSettings` and `NotificationManager`,
+//  which back themselves with `UserDefaults`.
 //
 
 import SwiftUI
 
+/// Root view for the "Settings" tab.
 struct SettingsView: View {
     @State private var showPrivacyPolicy = false
     @EnvironmentObject var appSettings: AppSettings
@@ -22,19 +34,67 @@ struct SettingsView: View {
 
                     // Appearance
                     settingsSection(title: "APPEARANCE") {
-                        SettingsRow(icon: "paintbrush.fill", iconColor: .purple, title: "Theme") {
-                            Picker("", selection: $appSettings.theme) {
-                                ForEach(AppTheme.allCases, id: \.self) { theme in
-                                    Text(theme.rawValue).tag(theme)
+                        VStack(spacing: 0) {
+                            SettingsRow(icon: "paintbrush.fill", iconColor: .purple, title: "Theme") {
+                                Picker("", selection: $appSettings.theme) {
+                                    ForEach(AppTheme.allCases, id: \.self) { theme in
+                                        Text(theme.rawValue).tag(theme)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(.secondary)
+                            }
+
+                            Divider().padding(.leading, 56)
+
+                            // Color theme picker — mini lot previews
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "paintpalette.fill")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .frame(width: 28, height: 28)
+                                        .background(appSettings.colorTheme.accent.gradient)
+                                        .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                                    Text("Color Theme")
+                                        .font(.subheadline)
+
+                                    Spacer()
+
+                                    Text(appSettings.colorTheme.displayName)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(ColorTheme.allCases) { theme in
+                                            ColorThemeCard(
+                                                theme: theme,
+                                                isSelected: appSettings.colorTheme == theme
+                                            ) {
+                                                withAnimation(.easeInOut(duration: 0.2)) {
+                                                    appSettings.colorTheme = theme
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 2)
+                                    .padding(.vertical, 4)
                                 }
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .tint(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                         }
                     }
 
                     // Notifications
+                    // Icon color story:
+                    //   pink = favorites (semantic)
+                    //   orange = warnings/threshold (semantic)
+                    //   yellow = test/playback action
                     settingsSection(title: "NOTIFICATIONS") {
                         VStack(spacing: 0) {
                             SettingsToggleRow(
@@ -79,6 +139,20 @@ struct SettingsView: View {
                                 .padding(.vertical, 12)
                             }
 
+                            Divider().padding(.leading, 56)
+
+                            // Test Notifications — fires one of each alert type, staggered.
+                            Button {
+                                notificationManager.sendTestNotifications()
+                            } label: {
+                                SettingsRow(icon: "bell.badge.fill", iconColor: .yellow, title: "Test Notifications") {
+                                    Image(systemName: "play.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(Color(.tertiaryLabel))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
                             if !notificationManager.isAuthorized {
                                 Divider().padding(.leading, 56)
 
@@ -97,8 +171,26 @@ struct SettingsView: View {
                     }
 
                     // Map
+                    // Icon color story:
+                    //   teal = map view options
+                    //   blue = handicap (semantic)
+                    //   indigo = numbers/labels
+                    //   red = destructive/sync action (refresh)
                     settingsSection(title: "MAP") {
                         VStack(spacing: 0) {
+                            SettingsRow(icon: "map.fill", iconColor: .teal, title: "Map Style") {
+                                Picker("", selection: $appSettings.mapStyle) {
+                                    ForEach(MapStyleChoice.allCases) { style in
+                                        Text(style.rawValue).tag(style)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(.secondary)
+                            }
+
+                            Divider().padding(.leading, 56)
+
                             SettingsToggleRow(
                                 icon: "figure.roll",
                                 iconColor: .blue,
@@ -120,7 +212,7 @@ struct SettingsView: View {
                             Button {
                                 parkingLot.fetchData()
                             } label: {
-                                SettingsRow(icon: "arrow.clockwise", iconColor: .green, title: "Refresh Data") {
+                                SettingsRow(icon: "arrow.clockwise", iconColor: .red, title: "Refresh Data") {
                                     Image(systemName: "chevron.right")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(Color(.tertiaryLabel))
@@ -131,6 +223,10 @@ struct SettingsView: View {
                     }
 
                     // Dashboard
+                    // Icon color story:
+                    //   pink = favorites (semantic)
+                    //   green = "online"/connection (semantic)
+                    //   gray = layout/density preference
                     settingsSection(title: "DASHBOARD") {
                         VStack(spacing: 0) {
                             SettingsToggleRow(
@@ -153,7 +249,7 @@ struct SettingsView: View {
 
                             SettingsToggleRow(
                                 icon: "rectangle.compress.vertical",
-                                iconColor: .teal,
+                                iconColor: .gray,
                                 title: "Compact Mode",
                                 isOn: $appSettings.compactDashboard
                             )
@@ -164,7 +260,7 @@ struct SettingsView: View {
                     settingsSection(title: "ABOUT") {
                         VStack(spacing: 0) {
                             SettingsRow(icon: "info.circle.fill", iconColor: .gray, title: "Version") {
-                                Text("2.0.0")
+                                Text("7.67")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -320,6 +416,68 @@ struct SettingsToggleRow: View {
     }
 }
 
+// MARK: - Color Theme Card
+// Mini "parking lot" preview card. Shows three little spots in the theme's
+// available + occupied + handicap colors so the user can see the theme applied
+// before committing to it.
+
+struct ColorThemeCard: View {
+    let theme: ColorTheme
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var asphalt: Color {
+        Color(red: 0.18, green: 0.18, blue: 0.20)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                // Mini lot preview — 3 spots on asphalt
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(asphalt)
+                        .frame(width: 88, height: 56)
+
+                    HStack(spacing: 5) {
+                        miniSpot(color: theme.availableColor)
+                        miniSpot(color: theme.availableColor)
+                        miniSpot(color: theme.occupiedColor)
+                        miniSpot(color: Color(red: 0.20, green: 0.40, blue: 0.90)) // handicap stays blue
+                    }
+
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(theme.accent, lineWidth: 2.5)
+                            .frame(width: 88, height: 56)
+                    }
+                }
+
+                // Label
+                HStack(spacing: 5) {
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(theme.accent)
+                    }
+                    Text(theme.displayName)
+                        .font(.caption.weight(isSelected ? .semibold : .regular))
+                        .foregroundColor(isSelected ? .primary : .secondary)
+                }
+            }
+            .accessibilityLabel(Text("Color theme: \(theme.displayName)"))
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func miniSpot(color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(color)
+            .frame(width: 9, height: 28)
+    }
+}
+
 // MARK: - Privacy Policy
 
 struct PrivacyPolicyView: View {
@@ -338,21 +496,21 @@ struct PrivacyPolicyView: View {
                         icon: "eye.slash.fill",
                         color: .blue,
                         title: "Data Collection",
-                        text: "We collect general vehicle presence data to determine parking spot availability. No license plate numbers, vehicle identification numbers, or exact vehicle details are ever captured or stored."
-                    )
-
-                    privacySection(
-                        icon: "cpu.fill",
-                        color: .purple,
-                        title: "AI Training",
-                        text: "Vehicle imagery may be used to improve our AI's ability to detect and classify different types of cars. This data is stored securely and used solely for model training purposes."
+                        text: "SpotSense only records whether each parking spot is occupied or available. No license plates, no vehicle identification numbers, no images of cars or drivers, and no personal information are ever captured or stored."
                     )
 
                     privacySection(
                         icon: "lock.fill",
                         color: .green,
                         title: "Data Security",
-                        text: "All collected data is stored securely. We do not sell, share, or distribute any data to third parties."
+                        text: "All occupancy data is stored securely on our backend. We do not sell, share, or distribute any data to third parties, advertisers, or partners."
+                    )
+
+                    privacySection(
+                        icon: "person.crop.circle.badge.xmark",
+                        color: .indigo,
+                        title: "No User Tracking",
+                        text: "SpotSense does not require an account, does not track your location, and does not use analytics or third-party trackers. Your favorites, theme, and settings stay on your device."
                     )
 
                     privacySection(

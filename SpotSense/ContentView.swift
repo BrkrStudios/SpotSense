@@ -1,30 +1,66 @@
 //
 //  ContentView.swift
-//  SpotSense
+//  SpotSense Senior Project
 //
-//  Created by Xander Angulo on 2/4/26.
+//  Created by Xander Angulo, Maden Edaugal on 1/4/26.
+//
+//  Largest file in the app. Contains:
+//
+//   • `ParkingLotLayout`        — tuning constants (spot size, asphalt
+//                                  color, default available/occupied
+//                                  fallbacks).
+//   • `LaneType`, `OccupancyTrend` — small enums used by the dashboard
+//                                     and the legacy SwiftUI grid view.
+//   • `ParkingLotDetailView`     — the actual Map tab. Hosts the
+//                                  `ParkingLotMapView` overlay, the
+//                                  Liquid-Glass button column, the
+//                                  themed counts capsule, the search
+//                                  field, and the spot-detail sheet.
+//   • `ParkingLotView` (legacy)  — pure-SwiftUI grid renderer used in
+//                                  earlier prototypes; kept around for
+//                                  the SwiftUI preview but not on the
+//                                  shipping screen.
+//   • `ParkingLotViewModel`      — `ObservableObject` that polls the API
+//                                  every 3 seconds, updates the live map,
+//                                  computes statistics, and feeds the
+//                                  notification system.
 //
 
 import SwiftUI
 import Combine
+import MapKit
 
 // MARK: - Layout Constants
 
+/// Visual + sizing constants used by the legacy SwiftUI parking grid and
+/// (for the color fallbacks) the MapKit overlay renderer. The grid uses
+/// these in design-pixel units; the overlay scales them by `scaleX` /
+/// `scaleY` derived from the lot's geographic dimensions.
 enum ParkingLotLayout {
-    static let spotWidth: CGFloat = 28
+    // Spot/lane sizing in grid points.
+    static let spotWidth:  CGFloat = 28
     static let spotHeight: CGFloat = 48
-    static let lineWidth: CGFloat = 1.5
+    static let lineWidth:  CGFloat = 1.5
     static let laneHeight: CGFloat = 56
-    static let roadWidth: CGFloat = 56
+    static let roadWidth:  CGFloat = 56
+
+    // Asphalt + lane colors used by the SwiftUI grid view.
     static let asphaltColor = Color(red: 0.18, green: 0.18, blue: 0.20)
-    static let lineColor = Color(red: 0.85, green: 0.85, blue: 0.80)
-    static let laneColor = Color(red: 0.22, green: 0.22, blue: 0.24)
-    static let handicapBlue = Color(red: 0.2, green: 0.4, blue: 0.9)
-    static let spotAvailable = Color(red: 0.2, green: 0.75, blue: 0.3)
-    static let spotOccupied = Color(red: 0.85, green: 0.15, blue: 0.15)
-    static let hatchYellow = Color(red: 0.83, green: 0.63, blue: 0.09)
-    static let grassColor = Color(red: 0.18, green: 0.35, blue: 0.12)
-    static let roadColor = Color(red: 0.22, green: 0.22, blue: 0.24)
+    static let lineColor    = Color(red: 0.85, green: 0.85, blue: 0.80)
+    static let laneColor    = Color(red: 0.22, green: 0.22, blue: 0.24)
+
+    // Default spot/handicap colors. The MapKit overlay overrides
+    // available/occupied via the active `ColorTheme`; handicap stays blue.
+    static let handicapBlue   = Color(red: 0.20, green: 0.40, blue: 0.90)
+    static let spotAvailable  = Color(red: 0.20, green: 0.75, blue: 0.30)
+    static let spotOccupied   = Color(red: 0.85, green: 0.15, blue: 0.15)
+
+    // Hatching for "not a spot" cells (light poles, aisles).
+    static let hatchYellow    = Color(red: 0.83, green: 0.63, blue: 0.09)
+
+    // Grass + roadway colors used by the SwiftUI grid view.
+    static let grassColor     = Color(red: 0.18, green: 0.35, blue: 0.12)
+    static let roadColor      = Color(red: 0.22, green: 0.22, blue: 0.24)
 }
 
 // MARK: - Lane Type
@@ -71,37 +107,22 @@ struct ParkingLotDetailView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @State private var isSearching: Bool = false
     @State private var searchText: String = ""
-    @State private var currentScale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
-    @State private var currentOffset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
-    @State private var currentRotation: Angle = .zero
-    @State private var lastRotation: Angle = .zero
-    @State private var pinchCenter: CGPoint? = nil
-    @State private var isPinching: Bool = false
     @State private var selectedSpotNumber: Int? = nil
+    @State private var mapNavigateToSpot: Int? = nil
+    @FocusState private var searchFieldFocused: Bool
 
     var body: some View {
         ZStack {
             mapLayer
+            bottomBlurLayer
             overlayLayer
 
             if isSearching {
                 searchOverlay
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        isSearching.toggle()
-                        if !isSearching { searchText = "" }
-                    }
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-            }
-        }
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: appSettings.shouldResetParkingData) { _, newValue in
             if newValue {
                 resetView()
@@ -154,41 +175,15 @@ struct ParkingLotDetailView: View {
 
     private func resetView() {
         parkingLot.reset()
-        currentScale = 1.0
-        lastScale = 1.0
-        currentOffset = .zero
-        lastOffset = .zero
-        currentRotation = .zero
-        lastRotation = .zero
+        mapNavigateToSpot = -1  // sentinel: reset camera to default
     }
 
     private func navigateToSpot(_ spotNum: Int? = nil) {
         let target = spotNum ?? Int(searchText)
         guard let targetSpot = target,
-              let position = ParkingLotMap.position(forSpotNumber: targetSpot) else { return }
+              ParkingLotMap.position(forSpotNumber: targetSpot) != nil else { return }
 
-        let spotCenter = ParkingLotMap.centerPoint(forRow: position.row, col: position.col)
-
-        let targetScale: CGFloat = 2.5
-        let parkingWidth = CGFloat(ParkingLotMap.spotsPerRow) * ParkingLotLayout.spotWidth
-        let mapWidth = ParkingLotLayout.roadWidth + parkingWidth + ParkingLotLayout.roadWidth
-        let mapHeight = ParkingLotLayout.laneHeight + 14 * ParkingLotLayout.spotHeight + 7 * ParkingLotLayout.laneHeight
-        let mapCenter = CGPoint(x: mapWidth / 2, y: mapHeight / 2)
-
-        let targetOffset = CGSize(
-            width: -(spotCenter.x - mapCenter.x) * targetScale,
-            height: -(spotCenter.y - mapCenter.y) * targetScale
-        )
-
-        withAnimation(.easeInOut(duration: 0.5)) {
-            currentScale = targetScale
-            currentOffset = targetOffset
-            currentRotation = .zero
-        }
-
-        lastScale = targetScale
-        lastOffset = targetOffset
-        lastRotation = .zero
+        mapNavigateToSpot = targetSpot
 
         withAnimation(.easeInOut(duration: 0.25)) {
             isSearching = false
@@ -198,136 +193,179 @@ struct ParkingLotDetailView: View {
         selectedSpotNumber = targetSpot
     }
 
-    // MARK: - Map Layer (Full-Screen)
+    // MARK: - Map Layer (Apple Maps with Overlay)
 
     private var mapLayer: some View {
-        GeometryReader { geo in
-            let viewCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+        ParkingLotMapView(
+            parkingLot: parkingLot,
+            favoritesManager: favoritesManager,
+            selectedSpotNumber: $selectedSpotNumber,
+            showSpotNumbers: appSettings.showSpotNumbers,
+            navigateToSpot: $mapNavigateToSpot,
+            showHandicapIndicator: appSettings.showHandicapIndicator,
+            mapStyle: appSettings.mapStyle,
+            colorTheme: appSettings.colorTheme
+        )
+        .ignoresSafeArea()
+    }
 
-            ParkingLotView(parkingLot: parkingLot, favoritesManager: favoritesManager, selectedSpotNumber: selectedSpotNumber, showSpotNumbers: appSettings.showSpotNumbers, onSpotTap: { spotNum in
-                selectedSpotNumber = spotNum
-            })
-                .rotationEffect(currentRotation)
-                .scaleEffect(currentScale, anchor: .center)
-                .offset(currentOffset)
-                .simultaneousGesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            isPinching = true
-                            let newScale = min(max(lastScale * value, 0.5), 4.0)
-                            let delta = newScale / currentScale
-                            let anchor = pinchCenter ?? viewCenter
-                            let anchorOffset = CGSize(
-                                width: anchor.x - viewCenter.x,
-                                height: anchor.y - viewCenter.y
-                            )
-                            currentOffset = CGSize(
-                                width: anchorOffset.width * (1 - delta) + currentOffset.width * delta,
-                                height: anchorOffset.height * (1 - delta) + currentOffset.height * delta
-                            )
-                            currentScale = newScale
-                        }
-                        .onEnded { _ in
-                            isPinching = false
-                            pinchCenter = nil
-                            lastScale = currentScale
-                            lastOffset = currentOffset
-                        }
-                )
-                .simultaneousGesture(
-                    RotationGesture()
-                        .onChanged { angle in
-                            currentRotation = lastRotation + angle
-                        }
-                        .onEnded { angle in
-                            lastRotation = currentRotation
-                        }
-                )
-                .simultaneousGesture(
-                    DragGesture()
-                        .onChanged { value in
-                            pinchCenter = value.startLocation
-                            if !isPinching {
-                                currentOffset = CGSize(
-                                    width: lastOffset.width + value.translation.width,
-                                    height: lastOffset.height + value.translation.height
-                                )
-                            }
-                        }
-                        .onEnded { _ in
-                            if !isPinching {
-                                lastOffset = currentOffset
-                            }
-                        }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+    // MARK: - Bottom Blur Layer (soft fade above tab bar)
+
+    private var bottomBlurLayer: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            // Soft fade above the tab bar that adapts to light/dark mode.
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(uiColor: .systemBackground).opacity(0),
+                    Color(uiColor: .systemBackground).opacity(0.55)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 90)
+            .allowsHitTesting(false)
         }
-        .background(ParkingLotLayout.asphaltColor)
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea()
     }
 
     // MARK: - Overlay Layer (Floating UI)
 
     private var overlayLayer: some View {
         VStack {
-            HStack(spacing: 0) {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(ParkingLotLayout.spotAvailable)
-                        .frame(width: 8, height: 8)
-                    Text("\(parkingLot.availableCount)")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.25))
-                    .frame(width: 1, height: 18)
-
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(ParkingLotLayout.spotOccupied)
-                        .frame(width: 8, height: 8)
-                    Text("\(parkingLot.occupiedCount)")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                if appSettings.showHandicapIndicator {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.25))
-                        .frame(width: 1, height: 18)
-
-                    HStack(spacing: 5) {
+            HStack(alignment: .center) {
+                // Counts capsule (left) — themed.
+                // Text uses .primary so it stays legible in both light and dark mode.
+                HStack(spacing: 0) {
+                    HStack(spacing: 6) {
                         Circle()
-                            .fill(ParkingLotLayout.handicapBlue)
-                            .frame(width: 8, height: 8)
-                        Text("\(parkingLot.handicapAvailableCount)")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
+                            .fill(appSettings.colorTheme.availableColor)
+                            .frame(width: 10, height: 10)
+                        Text("\(parkingLot.availableCount)")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.20))
+                        .frame(width: 1, height: 22)
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(appSettings.colorTheme.occupiedColor)
+                            .frame(width: 10, height: 10)
+                        Text("\(parkingLot.occupiedCount)")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+
+                    if appSettings.showHandicapIndicator {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.20))
+                            .frame(width: 1, height: 22)
+
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(ParkingLotLayout.handicapBlue)
+                                .frame(width: 10, height: 10)
+                            Text("\(parkingLot.handicapAvailableCount)")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                    }
+                }
+                .glassEffect(.regular, in: Capsule())
+                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+
+                Spacer()
+
+                // Right-side button column — Liquid Glass
+                VStack(spacing: 10) {
+                    glassCircleButton(icon: "magnifyingglass") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isSearching.toggle()
+                            if !isSearching {
+                                searchText = ""
+                                searchFieldFocused = false
+                            } else {
+                                searchFieldFocused = true
+                            }
+                        }
+                    }
+
+                    // Map style — dropdown menu
+                    Menu {
+                        ForEach(MapStyleChoice.allCases) { style in
+                            Button {
+                                appSettings.mapStyle = style
+                            } label: {
+                                Label(style.rawValue, systemImage: style.iconName)
+                                if appSettings.mapStyle == style {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: appSettings.mapStyle.iconName)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .frame(width: 50, height: 50)
+                            .contentShape(Circle())
+                            .glassEffect(.regular.interactive(), in: Circle())
+                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                    }
+                    .menuStyle(.borderlessButton)
+
+                    glassCircleButton(icon: "scope") {
+                        // Sentinel `-1` resets camera to default (see ParkingLotMapView)
+                        mapNavigateToSpot = -1
+                    }
                 }
             }
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
 
             Spacer()
         }
-        .padding(.top, 8)
+        .padding(.top, 0)
         .padding(.horizontal)
     }
 
+    /// Reusable Liquid-Glass circular button. Applying `contentShape(Circle())`
+    /// makes the entire 50pt frame tappable (otherwise SwiftUI hit-tests the
+    /// SF Symbol's tight bounding box, causing the "needs 2-3 taps" feel).
+    @ViewBuilder
+    private func glassCircleButton(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundColor(.primary)
+                .frame(width: 50, height: 50)
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: Circle())
+                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+    }
+
     // MARK: - Search Overlay
+    // Docked at the BOTTOM so the keyboard pushes it up smoothly instead of
+    // covering it. Tapping outside dismisses.
 
     private var searchOverlay: some View {
-        VStack {
+        VStack(spacing: 0) {
+            // Dim/tap-to-dismiss backdrop above the bar
+            Color.black.opacity(0.001)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    closeSearch()
+                }
+
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
@@ -335,6 +373,9 @@ struct ParkingLotDetailView: View {
                 TextField("Spot number (1-308)", text: $searchText)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.plain)
+                    .submitLabel(.go)
+                    .focused($searchFieldFocused)
+                    .onSubmit { if isValidSpotNumber { navigateToSpot() } }
 
                 if !searchText.isEmpty {
                     Button {
@@ -345,32 +386,38 @@ struct ParkingLotDetailView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(isValidSpotNumber ? Color.blue : Color.gray)
+                            .background(isValidSpotNumber ? appSettings.colorTheme.accent : Color.gray)
                             .cornerRadius(8)
                     }
                     .disabled(!isValidSpotNumber)
                 }
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        isSearching = false
-                        searchText = ""
-                    }
+                    closeSearch()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
+                        .imageScale(.large)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
-            .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+            .padding(14)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
             .padding(.horizontal)
-            .padding(.top, 8)
-
-            Spacer()
+            .padding(.bottom, 10)
         }
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func closeSearch() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isSearching = false
+            searchText = ""
+            searchFieldFocused = false
+        }
     }
 }
 
