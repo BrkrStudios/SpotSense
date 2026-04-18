@@ -1,14 +1,25 @@
 /**
  * Server-side access to the `temperature_readings` Firestore collection.
  *
- * Each doc shape (as pushed by the Pi devices):
- *   { deviceId: string, temperature: number (°F), mode: "heating"|"cooling",
- *     power: number (W), timestamp: string }
+ * Firmware doc shape (what the Pi actually writes):
+ *   { deviceId: string,
+ *     temperature: number  (Celsius),
+ *     mode: "HEATING" | "COOLING"  (uppercase),
+ *     power: number (W),
+ *     timestamp: string (ISO, e.g. "2026-04-18T17:13:45.788914+00:00") }
  *
- * This module mirrors the approach in firebase.ts::fetchLatestReadings:
- * equality-only query (no composite index), client-side sort to pick the
- * latest reading per device, defensive validation, and a deterministic
- * mock fallback when the collection is empty or unreachable.
+ * Our internal TemperatureReading is normalized:
+ *   - temperature → Fahrenheit (converted at the boundary here)
+ *   - mode       → lowercase "heating" | "cooling"
+ *
+ * This keeps the UI agnostic of firmware quirks — if a future firmware
+ * version starts emitting Fahrenheit or lowercase modes, only this file
+ * needs to change.
+ *
+ * Mirrors the approach in firebase.ts::fetchLatestReadings: equality-only
+ * query, client-side dedup-by-deviceId picking the latest timestamp,
+ * defensive validation, and a deterministic mock fallback when the
+ * collection is empty (demo / Firebase unreachable).
  */
 
 import { getDb } from "./firebase";
@@ -17,30 +28,38 @@ export type ClimateMode = "heating" | "cooling";
 
 export interface TemperatureReading {
   deviceId: string;
-  temperature: number; // °F
+  temperature: number; // °F (converted from firmware Celsius)
   mode: ClimateMode;
   power: number; // W
   timestamp: string; // ISO
 }
 
-function isClimateMode(v: unknown): v is ClimateMode {
-  return v === "heating" || v === "cooling";
+function celsiusToFahrenheit(c: number): number {
+  return (c * 9) / 5 + 32;
 }
 
 function coerceReading(raw: Record<string, unknown>): TemperatureReading | null {
   const deviceId = raw.deviceId;
-  const temperature = raw.temperature;
-  const mode = raw.mode;
+  const temperatureC = raw.temperature;
+  const modeRaw = raw.mode;
   const power = raw.power;
   const timestamp = raw.timestamp;
 
   if (typeof deviceId !== "string" || !deviceId) return null;
-  if (typeof temperature !== "number" || !Number.isFinite(temperature)) return null;
-  if (!isClimateMode(mode)) return null;
+  if (typeof temperatureC !== "number" || !Number.isFinite(temperatureC)) return null;
+  if (typeof modeRaw !== "string") return null;
+  const modeLower = modeRaw.trim().toLowerCase();
+  if (modeLower !== "heating" && modeLower !== "cooling") return null;
   if (typeof power !== "number" || !Number.isFinite(power)) return null;
   if (typeof timestamp !== "string" || !timestamp) return null;
 
-  return { deviceId, temperature, mode, power, timestamp };
+  return {
+    deviceId,
+    temperature: celsiusToFahrenheit(temperatureC),
+    mode: modeLower as ClimateMode,
+    power,
+    timestamp,
+  };
 }
 
 /**
