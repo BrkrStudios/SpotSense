@@ -83,12 +83,33 @@ function LoginForm() {
         router.replace(nextPath);
         return;
       }
-      if (data.need2fa) {
-        setStage("two_factor");
-        if (data.error === "invalid_code") setError("That code didn't match. Try again.");
+
+      // Rate-limited: server returns 429 with retry-after seconds.
+      if (res.status === 429 || data.error === "rate_limited") {
+        const mins = Math.ceil((data.retryAfterSec ?? 900) / 60);
+        setError(
+          `Too many failed attempts. Try again in about ${mins} minute${mins === 1 ? "" : "s"}.`
+        );
         return;
       }
-      setError("Invalid username or password.");
+
+      if (data.need2fa) {
+        setStage("two_factor");
+        if (data.error === "invalid_code") {
+          const hint =
+            typeof data.attemptsLeft === "number"
+              ? ` (${data.attemptsLeft} attempt${data.attemptsLeft === 1 ? "" : "s"} left)`
+              : "";
+          setError(`That code didn't match. Try again.${hint}`);
+        }
+        return;
+      }
+
+      const hint =
+        typeof data.attemptsLeft === "number"
+          ? ` (${data.attemptsLeft} attempt${data.attemptsLeft === 1 ? "" : "s"} left)`
+          : "";
+      setError(`Invalid username or password.${hint}`);
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
