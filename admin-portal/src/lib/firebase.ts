@@ -5,7 +5,7 @@ import path from "path";
 let app: App;
 let db: Firestore;
 
-function getDb(): Firestore {
+export function getDb(): Firestore {
   if (db) return db;
 
   if (getApps().length === 0) {

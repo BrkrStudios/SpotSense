@@ -6,6 +6,7 @@ import OccupancyChart from "@/components/dashboard/OccupancyChart";
 import AlertsFeed from "@/components/dashboard/AlertsFeed";
 import LiveActivityFeed from "@/components/dashboard/LiveActivityFeed";
 import SystemHealthSummary from "@/components/dashboard/SystemHealthSummary";
+import ClimateTiles from "@/components/dashboard/ClimateTiles";
 import { useParkingData } from "@/context/ParkingDataContext";
 import { COLORS } from "@/lib/constants";
 
@@ -89,6 +90,9 @@ export default function DashboardPage() {
             }
           />
         </div>
+
+        {/* Climate row — aggregates across all HVAC sensors in the lot */}
+        <ClimateTiles />
 
         {/* Chart */}
         <OccupancyChart data={occupancyHistory} serverTime={serverTime} />
