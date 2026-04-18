@@ -64,22 +64,39 @@ function coerceReading(raw: Record<string, unknown>): TemperatureReading | null 
 
 /**
  * Pull the latest reading per device from `temperature_readings`.
- * Falls through to the mock dataset on error or when nothing comes back —
- * keeps the dashboard useful in demo mode where the collection may be empty.
+ *
+ * Strategy: ask Firestore for the most recent RECENT_DOC_LIMIT docs sorted
+ * by timestamp descending, then keep the first reading we see per deviceId
+ * (which is guaranteed to be the newest for that device because of the
+ * server-side sort). This is both:
+ *
+ *   - Correct: we never accidentally surface a stale reading if a later
+ *     one exists for the same device.
+ *   - Cheap: a single indexed query with a hard ceiling, instead of a
+ *     full collection scan that grows with history.
+ *
+ * Falls through to the mock dataset on error or when nothing comes back
+ * so the dashboard stays useful in demo mode.
  */
+const RECENT_DOC_LIMIT = 500;
+
 export async function fetchTemperatureReadings(): Promise<TemperatureReading[]> {
   try {
     const firestore = getDb();
-    const snap = await firestore.collection("temperature_readings").get();
+    const snap = await firestore
+      .collection("temperature_readings")
+      .orderBy("timestamp", "desc")
+      .limit(RECENT_DOC_LIMIT)
+      .get();
+
     if (snap.empty) return getMockTemperatureReadings();
 
-    // Keep the freshest reading per deviceId.
+    // Server already sorted newest-first; first hit per deviceId wins.
     const latestByDevice = new Map<string, TemperatureReading>();
     for (const doc of snap.docs) {
       const reading = coerceReading(doc.data());
       if (!reading) continue;
-      const prev = latestByDevice.get(reading.deviceId);
-      if (!prev || reading.timestamp > prev.timestamp) {
+      if (!latestByDevice.has(reading.deviceId)) {
         latestByDevice.set(reading.deviceId, reading);
       }
     }
