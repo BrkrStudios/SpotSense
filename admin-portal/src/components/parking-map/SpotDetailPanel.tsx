@@ -182,7 +182,13 @@ export default function SpotDetailPanel({
                   src={sensor.cameraSnapshotUrl}
                   alt={`Spot ${spotId} camera snapshot`}
                   className="w-full h-auto rounded-lg"
-                  style={{ maxHeight: "240px", objectFit: "cover", transform: getRealSpotByNumber(spotId)?.firebaseSpotId === "A12" ? "rotate(180deg)" : undefined }}
+                  style={{
+                    maxHeight: "240px",
+                    objectFit: "cover",
+                    transform: getRealSpotByNumber(spotId)?.imageRotationDegrees
+                      ? `rotate(${getRealSpotByNumber(spotId)!.imageRotationDegrees}deg)`
+                      : undefined,
+                  }}
                 />
                 <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
                   Live from {getRealSpotByNumber(spotId)?.deviceId ?? "sensor"} · Updated {relativeTime(sensor.lastUpdated)}

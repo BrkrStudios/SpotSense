@@ -188,7 +188,13 @@ export default function SensorDetailPage({
                     src={displaySensor.cameraSnapshotUrl}
                     alt={`Spot ${spotId} camera snapshot`}
                     className="w-full h-auto rounded-lg"
-                    style={{ maxHeight: "300px", objectFit: "cover", transform: realSpotConfig?.firebaseSpotId === "A12" ? "rotate(180deg)" : undefined }}
+                    style={{
+                      maxHeight: "300px",
+                      objectFit: "cover",
+                      transform: realSpotConfig?.imageRotationDegrees
+                        ? `rotate(${realSpotConfig.imageRotationDegrees}deg)`
+                        : undefined,
+                    }}
                   />
                   <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
                     Live from {realSpotConfig?.deviceId ?? "sensor"} · Updated {relativeTime(displaySensor.lastUpdated)}

@@ -10,11 +10,20 @@ export interface RealSpotConfig {
   col: number;              // Grid column index
   firebaseSpotId: string;   // Firestore spotId field ("A12", "B12")
   deviceId: string;         // Pi Zero device name
+  /**
+   * Degrees to rotate the camera snapshot when displayed in the admin portal.
+   * Use when a camera is physically mounted inverted and the firmware
+   * doesn't correct orientation before upload. Default: 0 (no rotation).
+   */
+  imageRotationDegrees?: number;
 }
 
 export const REAL_SPOTS: RealSpotConfig[] = [
-  { spotNumber: 245, row: 18, col: 2, firebaseSpotId: "A12", deviceId: "spotsense-zero-001" },
-  { spotNumber: 267, row: 19, col: 2, firebaseSpotId: "B12", deviceId: "spotsense-zero-002" },
+  // Spot 245: camera was previously mounted upside-down so we rotated 180°.
+  // Firmware / mount was corrected — images now arrive right-side up, so no
+  // rotation is applied. Bump this back to 180 if the hardware flips again.
+  { spotNumber: 245, row: 18, col: 2, firebaseSpotId: "A12", deviceId: "spotsense-zero-001", imageRotationDegrees: 0 },
+  { spotNumber: 267, row: 19, col: 2, firebaseSpotId: "B12", deviceId: "spotsense-zero-002", imageRotationDegrees: 0 },
 ];
 
 /** Set of all real spot numbers for fast lookups */

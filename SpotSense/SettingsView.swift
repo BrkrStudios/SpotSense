@@ -35,7 +35,7 @@ struct SettingsView: View {
                     // Appearance
                     settingsSection(title: "APPEARANCE") {
                         VStack(spacing: 0) {
-                            SettingsRow(icon: "paintbrush.fill", iconColor: .purple, title: "Theme") {
+                            SettingsRow(icon: "paintbrush.fill", iconColor: appSettings.colorTheme.accent, title: "Theme") {
                                 Picker("", selection: $appSettings.theme) {
                                     ForEach(AppTheme.allCases, id: \.self) { theme in
                                         Text(theme.rawValue).tag(theme)
@@ -92,9 +92,9 @@ struct SettingsView: View {
 
                     // Notifications
                     // Icon color story:
-                    //   pink = favorites (semantic)
+                    //   accent = chrome / brand-tinted action (Test Notifications)
+                    //   pink   = favorites (semantic — stays pink across every theme)
                     //   orange = warnings/threshold (semantic)
-                    //   yellow = test/playback action
                     settingsSection(title: "NOTIFICATIONS") {
                         VStack(spacing: 0) {
                             SettingsToggleRow(
@@ -145,7 +145,7 @@ struct SettingsView: View {
                             Button {
                                 notificationManager.sendTestNotifications()
                             } label: {
-                                SettingsRow(icon: "bell.badge.fill", iconColor: .yellow, title: "Test Notifications") {
+                                SettingsRow(icon: "bell.badge.fill", iconColor: appSettings.colorTheme.accent, title: "Test Notifications") {
                                     Image(systemName: "play.fill")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(Color(.tertiaryLabel))
@@ -172,13 +172,12 @@ struct SettingsView: View {
 
                     // Map
                     // Icon color story:
-                    //   teal = map view options
-                    //   blue = handicap (semantic)
-                    //   indigo = numbers/labels
-                    //   red = destructive/sync action (refresh)
+                    //   accent = chrome (Map Style, Spot Numbers) — follows theme
+                    //   blue   = handicap (semantic — matches the on-map handicap color)
+                    //   red    = destructive/sync action (refresh)
                     settingsSection(title: "MAP") {
                         VStack(spacing: 0) {
-                            SettingsRow(icon: "map.fill", iconColor: .teal, title: "Map Style") {
+                            SettingsRow(icon: "map.fill", iconColor: appSettings.colorTheme.accent, title: "Map Style") {
                                 Picker("", selection: $appSettings.mapStyle) {
                                     ForEach(MapStyleChoice.allCases) { style in
                                         Text(style.rawValue).tag(style)
@@ -202,7 +201,7 @@ struct SettingsView: View {
 
                             SettingsToggleRow(
                                 icon: "number",
-                                iconColor: .indigo,
+                                iconColor: appSettings.colorTheme.accent,
                                 title: "Spot Numbers",
                                 isOn: $appSettings.showSpotNumbers
                             )
@@ -270,7 +269,7 @@ struct SettingsView: View {
                             Button {
                                 showPrivacyPolicy = true
                             } label: {
-                                SettingsRow(icon: "lock.shield.fill", iconColor: .blue, title: "Privacy Policy") {
+                                SettingsRow(icon: "lock.shield.fill", iconColor: appSettings.colorTheme.accent, title: "Privacy Policy") {
                                     Image(systemName: "chevron.right")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(Color(.tertiaryLabel))
@@ -306,22 +305,20 @@ struct SettingsView: View {
     // MARK: - App Header
 
     private var appHeader: some View {
+        // The SpotSense header (car badge + wordmark) now follows the active
+        // color theme so picking Blush paints it pink, Forest paints it green,
+        // etc. — the branded tile ties together with every other accent-tinted
+        // control on the Settings screen.
         HStack(spacing: 14) {
             RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.blue, Color.cyan],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(appSettings.colorTheme.accent.gradient)
                 .frame(width: 60, height: 60)
                 .overlay(
                     Image(systemName: "car.fill")
                         .font(.system(size: 26, weight: .semibold))
                         .foregroundColor(.white)
                 )
-                .shadow(color: .blue.opacity(0.25), radius: 8, y: 4)
+                .shadow(color: appSettings.colorTheme.accent.opacity(0.25), radius: 8, y: 4)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("SpotSense")
