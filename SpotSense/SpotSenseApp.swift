@@ -63,14 +63,15 @@ enum MapStyleChoice: String, CaseIterable, Identifiable {
 
 // MARK: - Color Theme
 
-/// A bundled "look" for the app. Each case defines three coordinated colors:
+/// A bundled "look" for the app. Each case defines four coordinated colors:
 ///
 ///   • `accent`         — chrome / button tint / selected tab tint.
 ///   • `availableColor` — fill color for available parking spots.
 ///   • `occupiedColor`  — fill color for occupied parking spots.
-///
-/// Handicap blue is intentionally left constant across themes because it is
-/// a universally-recognized accessibility convention.
+///   • `handicapColor`  — fill color for handicap spots. Classic keeps the
+///                        universal accessibility blue; every other theme
+///                        pulls from the accent so the handicap tiles blend
+///                        with the rest of the lot instead of standing out.
 enum ColorTheme: String, CaseIterable, Identifiable {
     case classic
     case blush
@@ -141,12 +142,23 @@ enum ColorTheme: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Fill color used for handicap parking spots in the overlay.
+    /// Classic keeps the canonical accessibility blue; every other theme
+    /// follows the accent so handicap tiles look intentional in the palette.
+    var handicapColor: Color {
+        switch self {
+        case .classic: return Color(red: 0.20, green: 0.40, blue: 0.90)
+        default:       return accent
+        }
+    }
+
     // MARK: UIColor variants
     // These are needed because the parking lot is drawn through an
     // `MKOverlayRenderer`, which works in `CGContext` and requires `UIColor`.
 
     var availableUIColor: UIColor { UIColor(availableColor) }
     var occupiedUIColor:  UIColor { UIColor(occupiedColor)  }
+    var handicapUIColor:  UIColor { UIColor(handicapColor)  }
 }
 
 // MARK: - App Theme (light / dark / fully black)

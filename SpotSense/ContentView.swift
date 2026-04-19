@@ -270,7 +270,7 @@ struct ParkingLotDetailView: View {
 
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(ParkingLotLayout.handicapBlue)
+                                .fill(appSettings.colorTheme.handicapColor)
                                 .frame(width: 10, height: 10)
                             Text("\(parkingLot.handicapAvailableCount)")
                                 .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -573,6 +573,8 @@ struct ParkingRowView: View {
 // MARK: - Parking Spot View
 
 struct ParkingSpotView: View {
+    @EnvironmentObject var appSettings: AppSettings
+
     let spot: ParkingSpot
     let row: Int
     let col: Int
@@ -589,11 +591,11 @@ struct ParkingSpotView: View {
 
     var indicatorColor: Color {
         if spot.status == .occupied {
-            return ParkingLotLayout.spotOccupied
+            return appSettings.colorTheme.occupiedColor
         } else if spot.isHandicap {
-            return ParkingLotLayout.handicapBlue
+            return appSettings.colorTheme.handicapColor
         } else {
-            return ParkingLotLayout.spotAvailable
+            return appSettings.colorTheme.availableColor
         }
     }
 

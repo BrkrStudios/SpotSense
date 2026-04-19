@@ -25,6 +25,14 @@ struct SettingsView: View {
     @EnvironmentObject var notificationManager: NotificationManager
     @EnvironmentObject var parkingLot: ParkingLotViewModel
 
+    /// Classic is treated as the "original / colorful" theme. Every other
+    /// theme ties chrome icons to the accent so the Settings screen reads
+    /// as one palette. `chromeIconColor(classic:)` returns the original
+    /// per-row color when Classic is selected, or the accent otherwise.
+    private func chromeIconColor(classic: Color) -> Color {
+        appSettings.colorTheme == .classic ? classic : appSettings.colorTheme.accent
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -35,7 +43,7 @@ struct SettingsView: View {
                     // Appearance
                     settingsSection(title: "APPEARANCE") {
                         VStack(spacing: 0) {
-                            SettingsRow(icon: "paintbrush.fill", iconColor: appSettings.colorTheme.accent, title: "Theme") {
+                            SettingsRow(icon: "paintbrush.fill", iconColor: chromeIconColor(classic: .purple), title: "Theme") {
                                 Picker("", selection: $appSettings.theme) {
                                     ForEach(AppTheme.allCases, id: \.self) { theme in
                                         Text(theme.rawValue).tag(theme)
@@ -92,9 +100,11 @@ struct SettingsView: View {
 
                     // Notifications
                     // Icon color story:
-                    //   accent = chrome / brand-tinted action (Test Notifications)
-                    //   pink   = favorites (semantic — stays pink across every theme)
-                    //   orange = warnings/threshold (semantic)
+                    //   chromeIconColor = follows the accent, except Classic
+                    //                     which restores the original color
+                    //                     (yellow bell, orange warning).
+                    //   pink            = favorites (semantic, stays pink
+                    //                     across every theme).
                     settingsSection(title: "NOTIFICATIONS") {
                         VStack(spacing: 0) {
                             SettingsToggleRow(
@@ -108,7 +118,7 @@ struct SettingsView: View {
 
                             SettingsToggleRow(
                                 icon: "exclamationmark.triangle.fill",
-                                iconColor: .orange,
+                                iconColor: chromeIconColor(classic: .orange),
                                 title: "Lot Nearly Full",
                                 isOn: $notificationManager.highOccupancyAlerts
                             )
@@ -116,6 +126,9 @@ struct SettingsView: View {
                             if notificationManager.highOccupancyAlerts {
                                 Divider().padding(.leading, 56)
 
+                                // Match the parent Lot Nearly Full row's color
+                                // (orange on Classic, accent on every other theme).
+                                let lotFullColor = chromeIconColor(classic: .orange)
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text("Alert Threshold")
@@ -123,7 +136,7 @@ struct SettingsView: View {
                                         Spacer()
                                         Text("\(notificationManager.highThreshold)%")
                                             .font(.subheadline.weight(.semibold).monospacedDigit())
-                                            .foregroundColor(.orange)
+                                            .foregroundColor(lotFullColor)
                                     }
                                     Slider(
                                         value: Binding(
@@ -133,7 +146,7 @@ struct SettingsView: View {
                                         in: 70...100,
                                         step: 5
                                     )
-                                    .tint(.orange)
+                                    .tint(lotFullColor)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -145,7 +158,7 @@ struct SettingsView: View {
                             Button {
                                 notificationManager.sendTestNotifications()
                             } label: {
-                                SettingsRow(icon: "bell.badge.fill", iconColor: appSettings.colorTheme.accent, title: "Test Notifications") {
+                                SettingsRow(icon: "bell.badge.fill", iconColor: chromeIconColor(classic: .yellow), title: "Test Notifications") {
                                     Image(systemName: "play.fill")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(Color(.tertiaryLabel))
@@ -172,12 +185,15 @@ struct SettingsView: View {
 
                     // Map
                     // Icon color story:
-                    //   accent = chrome (Map Style, Spot Numbers) — follows theme
-                    //   blue   = handicap (semantic — matches the on-map handicap color)
-                    //   red    = destructive/sync action (refresh)
+                    //   chromeIconColor = follows the accent, except Classic
+                    //                     which restores the original color
+                    //                     (teal map, indigo numbers).
+                    //   blue            = handicap (semantic — matches the
+                    //                     on-map handicap color).
+                    //   red             = destructive/sync action (refresh).
                     settingsSection(title: "MAP") {
                         VStack(spacing: 0) {
-                            SettingsRow(icon: "map.fill", iconColor: appSettings.colorTheme.accent, title: "Map Style") {
+                            SettingsRow(icon: "map.fill", iconColor: chromeIconColor(classic: .teal), title: "Map Style") {
                                 Picker("", selection: $appSettings.mapStyle) {
                                     ForEach(MapStyleChoice.allCases) { style in
                                         Text(style.rawValue).tag(style)
@@ -201,7 +217,7 @@ struct SettingsView: View {
 
                             SettingsToggleRow(
                                 icon: "number",
-                                iconColor: appSettings.colorTheme.accent,
+                                iconColor: chromeIconColor(classic: .indigo),
                                 title: "Spot Numbers",
                                 isOn: $appSettings.showSpotNumbers
                             )
@@ -269,7 +285,7 @@ struct SettingsView: View {
                             Button {
                                 showPrivacyPolicy = true
                             } label: {
-                                SettingsRow(icon: "lock.shield.fill", iconColor: appSettings.colorTheme.accent, title: "Privacy Policy") {
+                                SettingsRow(icon: "lock.shield.fill", iconColor: chromeIconColor(classic: .blue), title: "Privacy Policy") {
                                     Image(systemName: "chevron.right")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(Color(.tertiaryLabel))

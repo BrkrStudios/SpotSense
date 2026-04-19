@@ -68,10 +68,11 @@ class ParkingLotOverlayRenderer: MKOverlayRenderer {
     var showHandicapIndicator: Bool = true
 
     // Theme colors (UIColor for CG drawing). Defaults match the Classic theme
-    // so things still render if these are never set.
+    // so things still render if these are never set. Handicap is now a
+    // per-theme color too — swap it in when the ColorTheme changes.
     var availableColor: UIColor = UIColor(red: 0.20, green: 0.75, blue: 0.30, alpha: 1)
     var occupiedColor:  UIColor = UIColor(red: 0.85, green: 0.15, blue: 0.15, alpha: 1)
-    static let handicapColor: UIColor = UIColor(red: 0.20, green: 0.40, blue: 0.90, alpha: 1)
+    var handicapColor:  UIColor = UIColor(red: 0.20, green: 0.40, blue: 0.90, alpha: 1)
 
     // Pre-rendered SF Symbol images (created on main thread)
     var handicapImage: UIImage?
@@ -301,7 +302,7 @@ class ParkingLotOverlayRenderer: MKOverlayRenderer {
                 if spot.status == .occupied {
                     fillColor = occupiedColor
                 } else if spot.isHandicap {
-                    fillColor = ParkingLotOverlayRenderer.handicapColor
+                    fillColor = handicapColor
                 } else {
                     fillColor = availableColor
                 }
@@ -524,6 +525,7 @@ struct ParkingLotMapView: UIViewRepresentable {
             renderer.showHandicapIndicator = showHandicapIndicator
             renderer.availableColor = colorTheme.availableUIColor
             renderer.occupiedColor  = colorTheme.occupiedUIColor
+            renderer.handicapColor  = colorTheme.handicapUIColor
             renderer.setNeedsDisplay()
         }
 
