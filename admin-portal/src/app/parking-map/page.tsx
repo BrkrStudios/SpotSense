@@ -16,8 +16,36 @@ export default function ParkingMapPage() {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Pan/zoom fast path.
+   *
+   * The 283-spot grid (SVG + hundreds of divs) is expensive to re-render.
+   * If we `setOffset()` on every mousemove, we pay a full React reconciliation
+   * at ~60 Hz and the map visibly stutters — especially when the 3 s parking
+   * data poll arrives mid-drag.
+   *
+   * Instead we write the transform directly to the DOM via `transformRef`
+   * while dragging, and only sync the final offset back to React state on
+   * mouseup. rAF-throttled so we never queue more than one update per frame.
+   */
+  const transformRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const pendingPosRef = useRef<{ x: number; y: number } | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+  const scaleRef = useRef(1);
+
+  // Keep the transform DOM-synced whenever committed state changes
+  // (zoom buttons, fly-to-spot, reset). Also mirror scale to a ref so the
+  // imperative drag path always uses the latest zoom level.
+  useEffect(() => {
+    scaleRef.current = scale;
+    if (transformRef.current) {
+      transformRef.current.style.transform = `translate(${offset.x}px, ${offset.y}px) scale(${scale})`;
+    }
+  }, [offset, scale]);
 
   const mapWidth = ROAD_WIDTH + SPOTS_PER_ROW * SPOT_WIDTH + ROAD_WIDTH;
   // Calculate map height from aisle structure + top grass lane
@@ -82,19 +110,51 @@ export default function ParkingMapPage() {
     []
   );
 
-  // Pan via mouse drag
+  // --- Pan via mouse drag (imperative fast path) ---
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
-    setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+    // Capture the start anchor in a ref so rAF callbacks see the latest value
+    // without paying for a React state update.
+    dragStartRef.current = { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y };
   };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setOffset({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
+    pendingPosRef.current = {
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y,
+    };
+    // Coalesce to one DOM write per animation frame — higher than 60 Hz
+    // mousemove events collapse into a single transform update.
+    if (rafIdRef.current == null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        const pos = pendingPosRef.current;
+        if (!pos || !transformRef.current) return;
+        dragOffsetRef.current = pos;
+        transformRef.current.style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${scaleRef.current})`;
+      });
+    }
   };
-  const handleMouseUp = () => setIsDragging(false);
+
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (rafIdRef.current != null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    // Commit the final drag offset back into React state so subsequent
+    // zoom / reset / fly-to-spot actions read from a consistent source.
+    setOffset(dragOffsetRef.current);
+  };
+
+  // Sync the drag ref whenever committed offset changes from outside (zoom
+  // buttons, reset, fly-to-spot) so the next drag starts from the correct
+  // anchor and we don't "jump" on mousedown.
+  useEffect(() => {
+    dragOffsetRef.current = offset;
+  }, [offset]);
 
   const selectedSpot = selectedSpotId
     ? (() => {
@@ -190,12 +250,17 @@ export default function ParkingMapPage() {
             onMouseLeave={handleMouseUp}
           >
             <div
-              className="transition-transform duration-100"
+              ref={transformRef}
+              // No CSS transition during drag — each pan step would otherwise
+              // kick off a 100 ms ease animation that fights the next step
+              // ~16 ms later and the whole thing stutters. Button-driven
+              // zooms still feel snappy because they're a single write.
               style={{
                 transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                 transformOrigin: "0 0",
                 width: mapWidth,
                 height: mapHeight,
+                willChange: isDragging ? "transform" : undefined,
               }}
             >
               <ParkingLotGrid
