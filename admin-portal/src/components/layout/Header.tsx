@@ -10,7 +10,6 @@ const services: { label: string; color: string }[] = [
   { label: "Firebase", color: "#22C55E" },
   { label: "Railway", color: "#22C55E" },
   { label: "Pi 0", color: "#22C55E" },
-  { label: "API", color: "#22C55E" },
 ];
 
 export default function Header({ title, subtitle }: HeaderProps) {
