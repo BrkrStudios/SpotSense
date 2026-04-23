@@ -80,7 +80,7 @@ export default function DashboardPage() {
           <StatCard
             label="Sensors Online"
             value={stats.sensorsOnline}
-            total={stats.totalSpots}
+            total={stats.sensorsOnline + stats.sensorsOffline}
             color="#33BF4D"
             icon={
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#33BF4D" strokeWidth="2">

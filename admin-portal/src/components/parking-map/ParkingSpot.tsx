@@ -128,17 +128,33 @@ export default function ParkingSpot({
             }}
           />
 
-          {/* Handicap icon */}
+          {/* Handicap icon — International Symbol of Access (simplified
+              wheelchair). Old path drew a standing person which was
+              unreadable at this size and caused confusion. */}
           {spot.isHandicap && (
             <div className="absolute inset-0 flex items-center justify-center">
               <svg
                 viewBox="0 0 24 24"
-                width="10"
-                height="10"
-                fill="white"
-                className="opacity-90"
+                width="12"
+                height="12"
+                className="opacity-95"
               >
-                <path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm-1 8a4 4 0 0 0-4 4v1h2v-1a2 2 0 0 1 2-2h1v5h-3l-1 3h8l-1-3h-1V10h-3z" />
+                {/* head */}
+                <circle cx="13" cy="4" r="2" fill="white" />
+                {/* torso + leg bent forward */}
+                <path
+                  d="M11 7.5h3v4h3v2h-3v2l2 3h-3l-2-3V7.5z"
+                  fill="white"
+                />
+                {/* wheelchair wheel (ring) */}
+                <circle
+                  cx="10.5"
+                  cy="17"
+                  r="4"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1.4"
+                />
               </svg>
             </div>
           )}
