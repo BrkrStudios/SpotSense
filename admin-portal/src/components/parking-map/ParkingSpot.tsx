@@ -128,22 +128,30 @@ export default function ParkingSpot({
             }}
           />
 
-          {/* Handicap icon — Material Symbol "accessible" (the universal
-              accessibility pictogram: head + outstretched arms). Chosen
-              over a detailed wheelchair because it reads at 12–14px
-              where fine details on a wheelchair turn to mush. */}
+          {/* Handicap icon — person-in-wheelchair profile. Uses a big
+              100×100 viewBox with bold strokes so the shape holds up
+              when drawn at map scale (~13 px). */}
           {spot.isHandicap && (
             <div className="absolute inset-0 flex items-center justify-center">
               <svg
-                viewBox="0 0 24 24"
-                width="13"
-                height="13"
-                fill="white"
+                viewBox="0 0 100 100"
+                width="14"
+                height="14"
               >
-                {/* head */}
-                <circle cx="12" cy="4.5" r="2" />
-                {/* body with outstretched arms + legs */}
-                <path d="M21 9h-6v13h-2v-6h-2v6H9V9H3V7h18v2z" />
+                <g stroke="white" strokeLinecap="round" fill="none">
+                  {/* head */}
+                  <circle cx="62" cy="18" r="10" fill="white" stroke="none" />
+                  {/* back, leaning forward */}
+                  <line x1="57" y1="30" x2="50" y2="56" strokeWidth="10" />
+                  {/* shoulder/arm reaching forward over the wheel */}
+                  <line x1="58" y1="36" x2="80" y2="42" strokeWidth="9" />
+                  {/* thigh horizontal */}
+                  <line x1="46" y1="58" x2="68" y2="58" strokeWidth="9" />
+                  {/* shin kicking forward to footrest */}
+                  <line x1="68" y1="58" x2="82" y2="72" strokeWidth="9" />
+                  {/* wheelchair wheel */}
+                  <circle cx="42" cy="72" r="22" strokeWidth="8" />
+                </g>
               </svg>
             </div>
           )}
