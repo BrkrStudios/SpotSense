@@ -1,28 +1,35 @@
 import {
-  PARKING_ROW_INDICES,
-  SPOTS_PER_ROW,
-  TOTAL_NUMBERED_SPOTS,
+  USABLE_SPOTS,
   COLORS,
 } from "./constants";
 import { SpotStatus, ParkingSpot } from "./types";
 
-/** Convert spot number (1-220) to (row, col) — mirrors Swift ParkingLotMap.position(forSpotNumber:) */
+/**
+ * Spot numbers are 1..283 — sequential over the USABLE parking cells
+ * only. Grass islands and light-pole positions are skipped, so the
+ * visible numbers on the map never have gaps: spot #1 is a real spot,
+ * spot #283 is the last real spot, and nothing in between is a bollard.
+ *
+ * (Until 12.3 the numbering was 1..308 = grid-index math, which meant
+ * spot #1/#2/#3 were grass and the total ran higher than the usable
+ * count. Confusing for demos.)
+ */
+const POSITION_TO_NUMBER = new Map<string, number>();
+USABLE_SPOTS.forEach(({ row, col }, i) => {
+  POSITION_TO_NUMBER.set(`${row},${col}`, i + 1);
+});
+
+/** 1..283 → grid position. null if out of range. */
 export function positionForSpotNumber(
   spotNumber: number
 ): { row: number; col: number } | null {
-  if (spotNumber < 1 || spotNumber > TOTAL_NUMBERED_SPOTS) return null;
-  const zeroIndexed = spotNumber - 1;
-  const parkingRowIndex = Math.floor(zeroIndexed / SPOTS_PER_ROW);
-  const col = zeroIndexed % SPOTS_PER_ROW;
-  const row = PARKING_ROW_INDICES[parkingRowIndex];
-  return { row, col };
+  if (spotNumber < 1 || spotNumber > USABLE_SPOTS.length) return null;
+  return USABLE_SPOTS[spotNumber - 1];
 }
 
-/** Convert (row, col) to spot number (1-220) — mirrors Swift ParkingLotMap.spotNumber(forRow:col:) */
+/** Grid position → 1..283, or null for grass / not-a-spot cells. */
 export function spotNumberForPosition(row: number, col: number): number | null {
-  const parkingRowIndex = PARKING_ROW_INDICES.indexOf(row);
-  if (parkingRowIndex === -1) return null;
-  return parkingRowIndex * SPOTS_PER_ROW + col + 1;
+  return POSITION_TO_NUMBER.get(`${row},${col}`) ?? null;
 }
 
 /** Get status color hex for a parking spot */

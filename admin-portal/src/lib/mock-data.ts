@@ -23,7 +23,6 @@ import {
 import { spotNumberForPosition, seededRandom, getParkingLotLocalTime } from "./utils";
 import { REAL_SPOTS } from "./sensor-config";
 
-const UNUSABLE_COUNT = NOT_A_SPOT_POSITIONS.length + GRASS_POSITIONS.length;
 
 /** Returns a realistic occupancy fraction based on current day/time.
  *  Simplified version of the full day profiles used in the context. */
@@ -258,7 +257,7 @@ function buildOccupancyHistory(): OccupancyDataPoint[] {
     const peak = 12.5;
     const sigma = 3.5;
     const curve = Math.exp(-Math.pow(hour - peak, 2) / (2 * sigma * sigma));
-    const usableSpots = TOTAL_NUMBERED_SPOTS - UNUSABLE_COUNT;
+    const usableSpots = TOTAL_NUMBERED_SPOTS;
     const baseOccupancy = Math.floor(curve * 195 + 20 + (rand() - 0.5) * 20);
     const occupied = Math.min(usableSpots, Math.max(0, baseOccupancy));
 
@@ -319,7 +318,7 @@ export function getMockStats(): ParkingStats {
   }
 
   return {
-    totalSpots: TOTAL_NUMBERED_SPOTS - UNUSABLE_COUNT,
+    totalSpots: TOTAL_NUMBERED_SPOTS,
     available,
     occupied,
     handicapTotal: HANDICAP_POSITIONS.length,
@@ -340,7 +339,7 @@ export function getMockOccupancyHistory(): OccupancyDataPoint[] {
 /** Generate historical daily occupancy profiles for the past N days */
 export function generateHistoricalData(numDays: number = 14): DailyOccupancyProfile[] {
   const today = new Date();
-  const usableSpots = TOTAL_NUMBERED_SPOTS - UNUSABLE_COUNT;
+  const usableSpots = TOTAL_NUMBERED_SPOTS;
   const results: DailyOccupancyProfile[] = [];
 
   for (let d = numDays - 1; d >= 0; d--) {

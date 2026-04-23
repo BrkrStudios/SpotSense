@@ -17,8 +17,6 @@ import {
   PARKING_ROW_INDICES,
   SPOTS_PER_ROW,
   TOTAL_NUMBERED_SPOTS,
-  NOT_A_SPOT_POSITIONS,
-  GRASS_POSITIONS,
 } from "./constants";
 import { getMockParkingData } from "./mock-data";
 import { DAY_PROFILES, interpolateProfile } from "./occupancy-profiles";
@@ -36,15 +34,14 @@ interface SimulationState {
 }
 
 const GLOBAL_KEY = "__parkingSimulation" as const;
-const USABLE_SPOTS =
-  TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length;
+const USABLE_SPOT_COUNT = TOTAL_NUMBERED_SPOTS;
 
 /** Immediately snap occupancy to the current day/time target if it's far off.
  *  Called on every API request so it self-corrects even when HMR preserves stale state. */
 function correctOccupancyIfNeeded(state: SimulationState): void {
   const { hour, dayOfWeek } = getParkingLotLocalTime();
   const profile = DAY_PROFILES[dayOfWeek];
-  const targetOccupied = Math.round(interpolateProfile(profile, hour) * USABLE_SPOTS);
+  const targetOccupied = Math.round(interpolateProfile(profile, hour) * USABLE_SPOT_COUNT);
 
   let currentOccupied = 0;
   for (const rowIdx of PARKING_ROW_INDICES) {
@@ -137,7 +134,7 @@ function startSimulation(state: SimulationState): void {
     const { hour, dayOfWeek } = getParkingLotLocalTime();
     const profile = DAY_PROFILES[dayOfWeek];
     const targetFraction = interpolateProfile(profile, hour);
-    const targetOccupied = Math.round(targetFraction * USABLE_SPOTS);
+    const targetOccupied = Math.round(targetFraction * USABLE_SPOT_COUNT);
 
     // Count current occupied
     let currentOccupied = 0;

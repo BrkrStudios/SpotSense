@@ -26,12 +26,16 @@ export interface RealSpotConfig {
   staticImageOverride?: string;
 }
 
+// Spot numbering was reworked in 12.4 — spots are now numbered 1..283
+// (only usable cells count) instead of 1..308 (raw grid indices).
+// The iPhone photos in public/spots/ are filenames keyed to the OLD
+// numbers (245.jpg, 267.jpg) to avoid breaking the committed assets;
+// the sensor config maps new spot numbers → those filenames.
 export const REAL_SPOTS: RealSpotConfig[] = [
-  // Spot 245: currently overridden to a fixed demo photo (Mercedes).
-  // Drop the image at `admin-portal/public/spots/245.jpg` and it flows
-  // through. Clear staticImageOverride to restore the live Firebase feed.
+  // Row 18, col 2 used to be spot 245 under grid-index numbering.
+  // Under sequential usable-cell numbering it's spot 223.
   {
-    spotNumber: 245,
+    spotNumber: 223,
     row: 18,
     col: 2,
     firebaseSpotId: "A12",
@@ -39,9 +43,9 @@ export const REAL_SPOTS: RealSpotConfig[] = [
     imageRotationDegrees: 0,
     staticImageOverride: "/spots/245.jpg",
   },
-  // Spot 267: overridden to a fixed demo photo (empty handicap spot).
+  // Row 19, col 2 used to be spot 267 → now spot 243.
   {
-    spotNumber: 267,
+    spotNumber: 243,
     row: 19,
     col: 2,
     firebaseSpotId: "B12",

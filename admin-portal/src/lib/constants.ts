@@ -94,4 +94,32 @@ export const GRASS_POSITIONS: [number, number][] = [
   [3, 0], [3, 1], [3, 2], [3, 19], [3, 20], [3, 21],
 ];
 
-export const TOTAL_NUMBERED_SPOTS = PARKING_ROW_INDICES.length * SPOTS_PER_ROW; // 308
+// Raw grid cell count (14 rows × 22 cols = 308). Includes grass islands and
+// bollard/light-pole positions that don't correspond to parking spots.
+// Kept for internal grid iteration only — user-facing "spot count" is
+// TOTAL_NUMBERED_SPOTS below.
+export const GRID_CELL_COUNT = PARKING_ROW_INDICES.length * SPOTS_PER_ROW; // 308
+
+/**
+ * Ordered list of every usable parking-spot grid position.
+ * Built once at module load: walks the grid row-by-row, left-to-right,
+ * skipping grass + not-a-spot cells. The index of a position here + 1
+ * is its human-facing spot number (1..283).
+ */
+export const USABLE_SPOTS: readonly { row: number; col: number }[] = (() => {
+  const grass = new Set(GRASS_POSITIONS.map(([r, c]) => `${r},${c}`));
+  const notASpot = new Set(NOT_A_SPOT_POSITIONS.map(([r, c]) => `${r},${c}`));
+  const list: { row: number; col: number }[] = [];
+  for (const row of PARKING_ROW_INDICES) {
+    for (let col = 0; col < SPOTS_PER_ROW; col++) {
+      const key = `${row},${col}`;
+      if (grass.has(key) || notASpot.has(key)) continue;
+      list.push({ row, col });
+    }
+  }
+  return list;
+})();
+
+// Total user-facing parking spots (excludes grass + bollard cells).
+// This is what every "total spots" counter in the UI should divide into.
+export const TOTAL_NUMBERED_SPOTS = USABLE_SPOTS.length; // 283
