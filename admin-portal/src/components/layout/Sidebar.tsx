@@ -61,41 +61,35 @@ export default function Sidebar() {
           </p>
         </div>
 
-        {/* Navigation — each item is a full-width block so the hit box
-            covers the entire row. Pointer-events on the child SVG are
-            disabled so accidental clicks on the stroke outline always
-            route through the parent <Link> rather than landing in a
-            subpixel gap next to an adjacent item. */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const isActive =
               item.href === "/"
                 ? pathname === "/"
-                : pathname === item.href || pathname.startsWith(item.href + "/");
+                : pathname.startsWith(item.href);
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className="block w-full rounded-lg text-sm transition-colors"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
                 style={{
                   backgroundColor: isActive ? "var(--accent-soft)" : "transparent",
                   color: isActive ? "var(--accent)" : "var(--text-secondary)",
                 }}
               >
-                <span className="flex items-center gap-3 px-3 py-2.5 pointer-events-none">
-                  <svg
-                    className="w-5 h-5 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-                  </svg>
-                  {item.label}
-                </span>
+                <svg
+                  className="w-5 h-5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                </svg>
+                {item.label}
               </Link>
             );
           })}
