@@ -16,14 +16,39 @@ export interface RealSpotConfig {
    * doesn't correct orientation before upload. Default: 0 (no rotation).
    */
   imageRotationDegrees?: number;
+  /**
+   * Optional static image path (under /public) to show in place of the
+   * live Firebase camera snapshot. Useful for demo builds where you want
+   * the Parking Map / Sensor detail view to show a specific photo
+   * instead of whatever the Pi most recently uploaded. Set to undefined
+   * (or delete the field) to fall back to the live snapshot.
+   */
+  staticImageOverride?: string;
 }
 
 export const REAL_SPOTS: RealSpotConfig[] = [
-  // Spot 245: camera was previously mounted upside-down so we rotated 180°.
-  // Firmware / mount was corrected — images now arrive right-side up, so no
-  // rotation is applied. Bump this back to 180 if the hardware flips again.
-  { spotNumber: 245, row: 18, col: 2, firebaseSpotId: "A12", deviceId: "spotsense-zero-001", imageRotationDegrees: 0 },
-  { spotNumber: 267, row: 19, col: 2, firebaseSpotId: "B12", deviceId: "spotsense-zero-002", imageRotationDegrees: 0 },
+  // Spot 245: currently overridden to a fixed demo photo (Mercedes).
+  // Drop the image at `admin-portal/public/spots/245.jpg` and it flows
+  // through. Clear staticImageOverride to restore the live Firebase feed.
+  {
+    spotNumber: 245,
+    row: 18,
+    col: 2,
+    firebaseSpotId: "A12",
+    deviceId: "spotsense-zero-001",
+    imageRotationDegrees: 0,
+    staticImageOverride: "/spots/245.jpg",
+  },
+  // Spot 267: overridden to a fixed demo photo (empty handicap spot).
+  {
+    spotNumber: 267,
+    row: 19,
+    col: 2,
+    firebaseSpotId: "B12",
+    deviceId: "spotsense-zero-002",
+    imageRotationDegrees: 0,
+    staticImageOverride: "/spots/267.jpg",
+  },
 ];
 
 /** Set of all real spot numbers for fast lookups */

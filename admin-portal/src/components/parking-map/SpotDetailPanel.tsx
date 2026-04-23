@@ -176,22 +176,45 @@ export default function SpotDetailPanel({
 
           {/* Camera Snapshot */}
           <Section title="Camera Snapshot">
-            {sensor.cameraSnapshotUrl ? (
+            {/*
+              Image source:
+                - realSpotConfig.staticImageOverride wins when set
+                  (see sensor-config.ts). Drop the file under /public/spots/.
+                - Live Firebase snapshot path is DISABLED for demo.
+                  To restore: delete the staticImageOverride for this
+                  spot in sensor-config.ts, then swap the first branch
+                  back to the block below:
+
+                  sensor.cameraSnapshotUrl ? (
+                    <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
+                      <img
+                        src={sensor.cameraSnapshotUrl}
+                        alt={`Spot ${spotId} camera snapshot`}
+                        className="w-full h-auto rounded-lg"
+                        style={{
+                          maxHeight: "240px",
+                          objectFit: "cover",
+                          transform: getRealSpotByNumber(spotId)?.imageRotationDegrees
+                            ? `rotate(${getRealSpotByNumber(spotId)!.imageRotationDegrees}deg)`
+                            : undefined,
+                        }}
+                      />
+                      <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
+                        Live from {getRealSpotByNumber(spotId)?.deviceId ?? "sensor"} · Updated {relativeTime(sensor.lastUpdated)}
+                      </p>
+                    </div>
+                  )
+            */}
+            {getRealSpotByNumber(spotId)?.staticImageOverride ? (
               <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
                 <img
-                  src={sensor.cameraSnapshotUrl}
-                  alt={`Spot ${spotId} camera snapshot`}
+                  src={getRealSpotByNumber(spotId)!.staticImageOverride}
+                  alt={`Spot ${spotId} reference photo`}
                   className="w-full h-auto rounded-lg"
-                  style={{
-                    maxHeight: "240px",
-                    objectFit: "cover",
-                    transform: getRealSpotByNumber(spotId)?.imageRotationDegrees
-                      ? `rotate(${getRealSpotByNumber(spotId)!.imageRotationDegrees}deg)`
-                      : undefined,
-                  }}
+                  style={{ maxHeight: "240px", objectFit: "cover" }}
                 />
                 <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
-                  Live from {getRealSpotByNumber(spotId)?.deviceId ?? "sensor"} · Updated {relativeTime(sensor.lastUpdated)}
+                  Reference photo · Spot {spotId}
                 </p>
               </div>
             ) : (

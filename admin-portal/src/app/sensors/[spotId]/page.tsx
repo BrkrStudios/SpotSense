@@ -182,22 +182,46 @@ export default function SensorDetailPage({
 
             {/* Camera */}
             <Card title="Camera Snapshot">
-              {displaySensor.cameraSnapshotUrl ? (
+              {/*
+                Image source:
+                  - realSpotConfig.staticImageOverride wins when set.
+                    Drop the file under /public/spots/... and point the
+                    config at it (see sensor-config.ts).
+                  - Live Firebase snapshot path is DISABLED for demo.
+                    To restore: delete the staticImageOverride for this
+                    spot in sensor-config.ts, then swap the first branch
+                    back to the block below:
+
+                    displaySensor.cameraSnapshotUrl ? (
+                      <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
+                        <img
+                          src={displaySensor.cameraSnapshotUrl}
+                          alt={`Spot ${spotId} camera snapshot`}
+                          className="w-full h-auto rounded-lg"
+                          style={{
+                            maxHeight: "300px",
+                            objectFit: "cover",
+                            transform: realSpotConfig?.imageRotationDegrees
+                              ? `rotate(${realSpotConfig.imageRotationDegrees}deg)`
+                              : undefined,
+                          }}
+                        />
+                        <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
+                          Live from {realSpotConfig?.deviceId ?? "sensor"} · Updated {relativeTime(displaySensor.lastUpdated)}
+                        </p>
+                      </div>
+                    )
+              */}
+              {realSpotConfig?.staticImageOverride ? (
                 <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
                   <img
-                    src={displaySensor.cameraSnapshotUrl}
-                    alt={`Spot ${spotId} camera snapshot`}
+                    src={realSpotConfig.staticImageOverride}
+                    alt={`Spot ${spotId} reference photo`}
                     className="w-full h-auto rounded-lg"
-                    style={{
-                      maxHeight: "300px",
-                      objectFit: "cover",
-                      transform: realSpotConfig?.imageRotationDegrees
-                        ? `rotate(${realSpotConfig.imageRotationDegrees}deg)`
-                        : undefined,
-                    }}
+                    style={{ maxHeight: "300px", objectFit: "cover" }}
                   />
                   <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
-                    Live from {realSpotConfig?.deviceId ?? "sensor"} · Updated {relativeTime(displaySensor.lastUpdated)}
+                    Reference photo · Spot {spotId}
                   </p>
                 </div>
               ) : (
