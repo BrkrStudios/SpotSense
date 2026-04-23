@@ -6,7 +6,6 @@ interface HeaderProps {
 }
 
 const services: { label: string; color: string }[] = [
-  { label: "SpotSense", color: "#22C55E" },
   { label: "Firebase", color: "#22C55E" },
   { label: "Railway", color: "#22C55E" },
   { label: "Pi 0", color: "#22C55E" },

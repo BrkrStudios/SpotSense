@@ -5,7 +5,6 @@ import Header from "@/components/layout/Header";
 import StatCard from "@/components/dashboard/StatCard";
 import OccupancyChart from "@/components/dashboard/OccupancyChart";
 import WeeklyOccupancyChart from "@/components/analytics/WeeklyOccupancyChart";
-import PeakHoursChart from "@/components/analytics/PeakHoursChart";
 import CSVExportButton from "@/components/analytics/CSVExportButton";
 import OccupancyHeatmap from "@/components/analytics/OccupancyHeatmap";
 import BusiestSpots from "@/components/analytics/BusiestSpots";
@@ -55,7 +54,7 @@ export default function AnalyticsPage() {
       <div className="flex-1 p-4 md:p-8 space-y-6">
         {/* Top row: summary stats + export */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 flex-1">
             <StatCard
               label="Avg Weekday Occupancy"
               value={`${avgDailyOcc}%`}
@@ -88,22 +87,12 @@ export default function AnalyticsPage() {
                 </svg>
               }
             />
-            <StatCard
-              label="Avg Turnover"
-              value={`${weeklyStats.avgTurnoverRate}x/day`}
-              color="#A855F7"
-              icon={
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="2">
-                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              }
-            />
           </div>
           <CSVExportButton data={historicalData} />
         </div>
 
         {/* Second row: live metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <StatCard
             label="Current Occupancy"
             value={`${occupancyPercent}%`}
@@ -137,20 +126,6 @@ export default function AnalyticsPage() {
             }
             subtitle="vs yesterday's avg"
           />
-          <StatCard
-            label="Spots Sampled"
-            value={Object.keys(heatmapData).length}
-            total={stats.totalSpots}
-            color="#8B5CF6"
-            icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-              </svg>
-            }
-          />
         </div>
 
         {/* Today's occupancy chart (reuses dashboard component) */}
@@ -170,9 +145,6 @@ export default function AnalyticsPage() {
 
         {/* Weekly overlay chart */}
         <WeeklyOccupancyChart data={historicalData} />
-
-        {/* Peak hours bar chart */}
-        <PeakHoursChart stats={weeklyStats} />
       </div>
     </div>
   );

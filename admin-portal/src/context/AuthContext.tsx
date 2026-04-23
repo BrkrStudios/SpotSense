@@ -5,7 +5,6 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 export interface CurrentUser {
   username: string;
   memberSince: string;
-  twoFactorEnabled: boolean;
 }
 
 interface AuthContextValue {

@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import {
-  verifyPassword,
-  issueSession,
-  readAuthState,
-  SESSION_COOKIE,
-  verifyTotp,
-} from "@/lib/auth";
+import { verifyPassword, issueSession, SESSION_COOKIE } from "@/lib/auth";
 import {
   checkRateLimit,
   recordFailure,
@@ -18,13 +12,11 @@ export const runtime = "nodejs";
 
 /**
  * POST /api/auth/login
- * Body: { username, password, code? }
+ * Body: { username, password }
  *
  * Responses:
  *   200 { ok: true }                                   — session cookie set
- *   200 { ok: false, need2fa: true }                   — password OK, code required
  *   401 { ok: false, error: "invalid", attemptsLeft }  — bad creds (counts as failure)
- *   401 { ok: false, error: "invalid_code", need2fa }  — bad TOTP  (counts as failure)
  *   429 { ok: false, error: "rate_limited", retryAfterSec } — IP locked out
  *
  * Rate limiting is per-IP: 5 failures in 15 min → 15 min lockout. Successful
@@ -43,14 +35,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { username?: string; password?: string; code?: string };
+  let body: { username?: string; password?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
   }
 
-  const { username = "", password = "", code } = body;
+  const { username = "", password = "" } = body;
 
   // 2) Password check. A miss counts as a rate-limit failure.
   const ok = await verifyPassword(username, password);
@@ -69,36 +61,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const state = readAuthState();
-  const needs2fa = state.twoFactor.enabled && !!state.twoFactor.secret;
-
-  if (needs2fa) {
-    // Prompting for a code is NOT a failure — don't record.
-    if (!code) {
-      return NextResponse.json({ ok: false, need2fa: true });
-    }
-    // A wrong code counts as a failure (attacker brute-forcing codes).
-    if (!verifyTotp(state.twoFactor.secret!, code)) {
-      const after = recordFailure(ip);
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "invalid_code",
-          need2fa: true,
-          attemptsLeft: after.attemptsLeft,
-          retryAfterSec: after.retryAfterSec,
-        },
-        after.ok
-          ? { status: 401 }
-          : { status: 429, headers: { "Retry-After": String(after.retryAfterSec ?? 60) } }
-      );
-    }
-  }
-
   // 3) Success — clear the bucket and issue a session.
   clearFailures(ip);
 
-  const token = await issueSession({ sub: username, twoFactorPassed: true });
+  const token = await issueSession({ sub: username });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,

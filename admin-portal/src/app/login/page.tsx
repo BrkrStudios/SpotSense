@@ -3,8 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-type Stage = "credentials" | "two_factor";
-
 export default function LoginPage() {
   // useSearchParams() needs a Suspense boundary during prerender.
   return (
@@ -28,10 +26,8 @@ function LoginForm() {
   const params = useSearchParams();
   const nextPath = params.get("next") ?? "/";
 
-  const [stage, setStage] = useState<Stage>("credentials");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -71,11 +67,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password,
-          code: stage === "two_factor" ? code : undefined,
-        }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
 
@@ -90,18 +82,6 @@ function LoginForm() {
         setError(
           `Too many failed attempts. Try again in about ${mins} minute${mins === 1 ? "" : "s"}.`
         );
-        return;
-      }
-
-      if (data.need2fa) {
-        setStage("two_factor");
-        if (data.error === "invalid_code") {
-          const hint =
-            typeof data.attemptsLeft === "number"
-              ? ` (${data.attemptsLeft} attempt${data.attemptsLeft === 1 ? "" : "s"} left)`
-              : "";
-          setError(`That code didn't match. Try again.${hint}`);
-        }
         return;
       }
 
@@ -140,70 +120,42 @@ function LoginForm() {
             SpotSense Admin
           </h1>
           <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-            {stage === "credentials"
-              ? "Sign in to continue"
-              : "Enter the 6-digit code from your authenticator app"}
+            Sign in to continue
           </p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
-          {stage === "credentials" && (
-            <>
-              <Field label="Username">
-                <input
-                  type="text"
-                  autoComplete="username"
-                  autoFocus
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none border"
-                  style={{
-                    backgroundColor: "var(--surface)",
-                    borderColor: "var(--border)",
-                    color: "var(--text-primary)",
-                  }}
-                />
-              </Field>
-              <Field label="Password">
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none border"
-                  style={{
-                    backgroundColor: "var(--surface)",
-                    borderColor: "var(--border)",
-                    color: "var(--text-primary)",
-                  }}
-                />
-              </Field>
-            </>
-          )}
-
-          {stage === "two_factor" && (
-            <Field label="Authentication code">
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                autoFocus
-                required
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                className="w-full px-3 py-2 rounded-lg text-lg text-center tabular-nums tracking-[0.3em] outline-none border"
-                style={{
-                  backgroundColor: "var(--surface)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-primary)",
-                }}
-                placeholder="000000"
-              />
-            </Field>
-          )}
+          <Field label="Username">
+            <input
+              type="text"
+              autoComplete="username"
+              autoFocus
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none border"
+              style={{
+                backgroundColor: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </Field>
+          <Field label="Password">
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none border"
+              style={{
+                backgroundColor: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </Field>
 
           {error && (
             <div
@@ -224,27 +176,8 @@ function LoginForm() {
               opacity: busy ? 0.7 : 1,
             }}
           >
-            {busy
-              ? "Working..."
-              : stage === "credentials"
-                ? "Sign in"
-                : "Verify code"}
+            {busy ? "Working..." : "Sign in"}
           </button>
-
-          {stage === "two_factor" && (
-            <button
-              type="button"
-              onClick={() => {
-                setStage("credentials");
-                setCode("");
-                setError(null);
-              }}
-              className="w-full text-xs"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              ← Use a different account
-            </button>
-          )}
         </form>
       </div>
     </div>

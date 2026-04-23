@@ -1,6 +1,7 @@
 "use client";
 
 import { ParkingLotData } from "@/lib/types";
+import { useTemperature } from "@/hooks/useTemperature";
 
 interface SystemHealthProps {
   data: ParkingLotData;
@@ -19,6 +20,8 @@ export default function SystemHealthSummary({
   sensorsOnline,
   sensorsOffline,
 }: SystemHealthProps) {
+  const climate = useTemperature();
+
   return (
     <div
       className="rounded-xl border"
@@ -64,6 +67,41 @@ export default function SystemHealthSummary({
             </span>
           </div>
         </div>
+
+        {/* Climate — numbers reported by the parking sensor itself
+            (heatsink / enclosure temp + HVAC draw of the Pi unit), NOT
+            ambient air temperature. Clearly labeled so nobody confuses
+            this with "current weather". */}
+        <div className="pt-4 border-t" style={{ borderColor: "var(--border)" }}>
+          <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: "var(--text-secondary)" }}>
+            Parking Sensor Climate
+          </p>
+          <p className="text-[10px] -mt-1 mb-3" style={{ color: "var(--text-secondary)", opacity: 0.75 }}>
+            Sensor hardware readings — not outdoor temperature
+          </p>
+          <ClimateRow
+            label="Avg Temp"
+            value={climate.avgTemp == null ? "—" : `${climate.avgTemp.toFixed(1)}°F`}
+            color={tempColor(climate.avgTemp)}
+          />
+          <ClimateRow
+            label="Mode"
+            value={
+              climate.dominantMode == null
+                ? "—"
+                : climate.dominantMode === "heating"
+                  ? "Heating"
+                  : "Cooling"
+            }
+            color={modeColor(climate.dominantMode)}
+          />
+          <ClimateRow
+            label="Avg Power"
+            value={climate.avgPower == null ? "—" : `${climate.avgPower.toFixed(1)} W`}
+            color="var(--accent)"
+          />
+        </div>
+
         <div className="pt-4 border-t" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
@@ -75,6 +113,42 @@ export default function SystemHealthSummary({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function tempColor(temp: number | null): string {
+  if (temp == null) return "var(--text-secondary)";
+  if (temp < 65) return "#3B82F6"; // too cold
+  if (temp > 78) return "#D92626"; // too hot
+  return "var(--accent)";
+}
+
+function modeColor(mode: "heating" | "cooling" | null): string {
+  if (mode == null) return "var(--text-secondary)";
+  return mode === "heating" ? "#F97316" : "#3B82F6";
+}
+
+function ClimateRow({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center justify-between mt-1.5 first:mt-0">
+      <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+        {label}
+      </span>
+      <span
+        className="text-sm font-medium tabular-nums"
+        style={{ color }}
+      >
+        {value}
+      </span>
     </div>
   );
 }

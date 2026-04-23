@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifySession, SESSION_COOKIE, readAuthState } from "@/lib/auth";
+import {
+  verifySession,
+  SESSION_COOKIE,
+  ADMIN_MEMBER_SINCE,
+} from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -11,13 +15,11 @@ export async function GET() {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  const state = readAuthState();
   return NextResponse.json({
     authenticated: true,
     user: {
       username: session.sub,
-      memberSince: state.createdAt,
-      twoFactorEnabled: state.twoFactor.enabled,
+      memberSince: ADMIN_MEMBER_SINCE,
     },
   });
 }
