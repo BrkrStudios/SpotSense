@@ -215,12 +215,35 @@ export default function SensorDetailPage({
                     )
               */}
               {(() => {
-                // 1) Real hardware spots → their specific override photo.
-                // 2) Simulated spots that are ONLINE → cycle through 4 demo
-                //    reference photos so the spot detail view always has
-                //    something to show during the presentation.
-                // 3) Offline sensors → "No image available" placeholder so
-                //    it's obvious no fresh image is expected.
+                // Image source rules (admin portal only — iOS app renders
+                // its own way from /api/parking):
+                //   1. Spot is FREE → no photo. If you can see the spot
+                //      is available, you don't need a picture of an empty
+                //      parking space. Shows a "No image — spot is free"
+                //      placeholder instead.
+                //   2. Real hardware spot + occupied → staticImageOverride.
+                //   3. Simulated spot + occupied + sensor online → cycle
+                //      through the 4 demo photos.
+                //   4. Sensor offline (occupied per last known state) →
+                //      "No image available" placeholder.
+                const isOccupied = spot.status === SpotStatus.Occupied;
+                if (!isOccupied) {
+                  return (
+                    <div
+                      className="w-full aspect-video rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: "var(--surface)" }}
+                    >
+                      <div className="text-center">
+                        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                          Spot is free
+                        </p>
+                        <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
+                          Camera only captures when the spot is occupied
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
                 const overrideSrc = realSpotConfig?.staticImageOverride;
                 const demoSrc = displaySensor.sensorOnline
                   ? getDemoImageForSpot(spotId)

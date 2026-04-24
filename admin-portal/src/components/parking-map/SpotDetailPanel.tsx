@@ -209,7 +209,30 @@ export default function SpotDetailPanel({
             */}
             {(() => {
               // Same image-source rules as the Sensor detail page:
-              //   real spot override → demo image (if online) → placeholder.
+              //   1. Free spot → no photo, "Spot is free" placeholder.
+              //   2. Occupied + real spot override → override photo.
+              //   3. Occupied + simulated + online → demo photo.
+              //   4. Occupied + offline → "No image available" placeholder.
+              // (iOS renders independently from /api/parking so this is
+              // display-only and doesn't leak back to the app.)
+              const isOccupied = spot.status === SpotStatus.Occupied;
+              if (!isOccupied) {
+                return (
+                  <div
+                    className="w-full aspect-video rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: "var(--surface)" }}
+                  >
+                    <div className="text-center px-3">
+                      <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                        Spot is free
+                      </p>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
+                        Camera only captures when occupied
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
               const overrideSrc = getRealSpotByNumber(spotId)?.staticImageOverride;
               const demoSrc = sensor.sensorOnline
                 ? getDemoImageForSpot(spotId)

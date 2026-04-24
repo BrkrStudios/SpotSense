@@ -90,6 +90,53 @@ export async function getRealSpotsData(): Promise<
 
   // Map Firebase readings to our real spot configs
   for (const config of REAL_SPOTS) {
+    // DEMO OVERRIDE — spot 267 is hard-pinned to "free" for the
+    // presentation. The TOF distance is synthesized at the top of the
+    // sensor's clear-path range so the reading is internally consistent
+    // with an Available status. The real Firebase read for B12 is
+    // commented out below — remove the override block + un-comment the
+    // real read to go back to live data.
+    if (config.spotNumber === 267) {
+      result[config.spotNumber] = {
+        status: SpotStatus.Available,
+        sensor: {
+          spotId: config.spotNumber,
+          row: config.row,
+          col: config.col,
+          distanceMm: 1500, // clear path — nothing parked
+          objectDetected: false,
+          cameraSnapshotUrl: null,
+          lastUpdated: new Date().toISOString(),
+          batteryPercent: null,
+          sensorOnline: true,
+          consecutiveDetections: 0,
+        },
+      };
+      continue;
+
+      // --- Live Firebase path for spot 267 (disabled for demo) ---
+      // const reading = readings[config.firebaseSpotId];
+      // if (!reading) continue;
+      // const isOccupied = reading.occupied;
+      // let snapshotUrl: string | null = null;
+      // if (reading.imagePath && reading.deviceId === config.deviceId) {
+      //   snapshotUrl = reading.imagePath;
+      // }
+      // result[config.spotNumber] = {
+      //   status: isOccupied ? SpotStatus.Occupied : SpotStatus.Available,
+      //   sensor: {
+      //     spotId: config.spotNumber, row: config.row, col: config.col,
+      //     distanceMm: reading.distanceMm ?? 0,
+      //     objectDetected: isOccupied,
+      //     cameraSnapshotUrl: snapshotUrl,
+      //     lastUpdated: reading.timestamp,
+      //     batteryPercent: null,
+      //     sensorOnline: true,
+      //     consecutiveDetections: isOccupied ? 5 : 0,
+      //   },
+      // };
+    }
+
     const reading = readings[config.firebaseSpotId];
     if (!reading) continue;
 
