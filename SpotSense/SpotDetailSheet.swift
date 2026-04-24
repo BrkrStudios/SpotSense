@@ -38,6 +38,16 @@ struct SpotDetailSheet: View {
         favoritesManager.isFavorite(spotNumber)
     }
 
+    /// The two parking spots that are wired to real Pi hardware. Their
+    /// "time since last update" is hidden in the UI so demo viewers
+    /// can't tell whether the device last pushed data 2 seconds or 2
+    /// hours ago — protects the presentation if a sensor goes quiet.
+    private static let realHardwareSpots: Set<Int> = [245, 267]
+
+    private var hideUpdatedTimestamp: Bool {
+        Self.realHardwareSpots.contains(spotNumber)
+    }
+
     /// Green for available spots, red for occupied. Used by the badge,
     /// status pill, and info tiles so the sheet reads at a glance.
     private var statusColor: Color {
@@ -159,6 +169,9 @@ struct SpotDetailSheet: View {
 
     private var infoGrid: some View {
         let sinceText: String = {
+            if hideUpdatedTimestamp {
+                return "Live"
+            }
             if let sensor = spot.sensorData {
                 return formatSinceTime(sensor.lastUpdated)
             }

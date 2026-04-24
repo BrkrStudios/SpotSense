@@ -151,12 +151,14 @@ export default function SensorDetailPage({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Last Updated</span>
-                  <span className="text-sm" style={{ color: "var(--text-primary)" }} suppressHydrationWarning>
-                    {relativeTime(displaySensor.lastUpdated)}
-                  </span>
-                </div>
+                {!isRealSpot(spotId) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Last Updated</span>
+                    <span className="text-sm" style={{ color: "var(--text-primary)" }} suppressHydrationWarning>
+                      {relativeTime(displaySensor.lastUpdated)}
+                    </span>
+                  </div>
+                )}
                 {displaySensor.batteryPercent !== null && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -221,7 +223,7 @@ export default function SensorDetailPage({
                     style={{ maxHeight: "300px", objectFit: "cover" }}
                   />
                   <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
-                    Reference photo · Spot {spotId}
+                    Spot {spotId}
                   </p>
                 </div>
               ) : (

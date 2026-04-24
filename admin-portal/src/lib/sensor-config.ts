@@ -26,16 +26,12 @@ export interface RealSpotConfig {
   staticImageOverride?: string;
 }
 
-// Spot numbering was reworked in 12.4 — spots are now numbered 1..283
-// (only usable cells count) instead of 1..308 (raw grid indices).
-// The iPhone photos in public/spots/ are filenames keyed to the OLD
-// numbers (245.jpg, 267.jpg) to avoid breaking the committed assets;
-// the sensor config maps new spot numbers → those filenames.
+// Spot numbering is grid-index based (1..308) to match the iOS app.
+// Real hardware spots 245 and 267 sit at grid positions [row 18, col 2]
+// and [row 19, col 2] respectively.
 export const REAL_SPOTS: RealSpotConfig[] = [
-  // Row 18, col 2 used to be spot 245 under grid-index numbering.
-  // Under sequential usable-cell numbering it's spot 223.
   {
-    spotNumber: 223,
+    spotNumber: 245,
     row: 18,
     col: 2,
     firebaseSpotId: "A12",
@@ -43,9 +39,8 @@ export const REAL_SPOTS: RealSpotConfig[] = [
     imageRotationDegrees: 0,
     staticImageOverride: "/spots/245.jpg",
   },
-  // Row 19, col 2 used to be spot 267 → now spot 243.
   {
-    spotNumber: 243,
+    spotNumber: 267,
     row: 19,
     col: 2,
     firebaseSpotId: "B12",

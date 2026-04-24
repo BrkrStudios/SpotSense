@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SensorReading, ParkingSpot } from "@/lib/types";
 import { spotColor, relativeTime } from "@/lib/utils";
+import { isRealSpot } from "@/lib/sensor-config";
 import SensorStatusBadge from "./SensorStatusBadge";
 
 interface SensorCardProps {
@@ -13,6 +14,7 @@ interface SensorCardProps {
 
 export default function SensorCard({ spotId, spot, sensor }: SensorCardProps) {
   const color = spotColor(spot);
+  const hideTimestamp = isRealSpot(spotId);
 
   return (
     <Link href={`/sensors/${spotId}`}>
@@ -49,12 +51,14 @@ export default function SensorCard({ spotId, spot, sensor }: SensorCardProps) {
               {sensor.batteryPercent ?? "—"}%
             </span>
           </div>
-          <div className="flex justify-between">
-            <span style={{ color: "var(--text-secondary)" }}>Updated</span>
-            <span style={{ color: "var(--text-primary)" }}>
-              {relativeTime(sensor.lastUpdated)}
-            </span>
-          </div>
+          {!hideTimestamp && (
+            <div className="flex justify-between">
+              <span style={{ color: "var(--text-secondary)" }}>Updated</span>
+              <span style={{ color: "var(--text-primary)" }}>
+                {relativeTime(sensor.lastUpdated)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </Link>

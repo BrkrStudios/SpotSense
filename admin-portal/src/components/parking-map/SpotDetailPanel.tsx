@@ -2,7 +2,7 @@
 
 import { SensorReading, ParkingSpot, SpotStatus } from "@/lib/types";
 import { spotColor, relativeTime } from "@/lib/utils";
-import { getRealSpotByNumber } from "@/lib/sensor-config";
+import { getRealSpotByNumber, isRealSpot } from "@/lib/sensor-config";
 
 interface SpotDetailPanelProps {
   spotId: number;
@@ -91,9 +91,11 @@ export default function SpotDetailPanel({
                 {sensor.sensorOnline ? "Online" : "Offline"}
               </span>
             </div>
-            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-              Last updated: {relativeTime(sensor.lastUpdated)}
-            </p>
+            {!isRealSpot(spotId) && (
+              <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+                Last updated: {relativeTime(sensor.lastUpdated)}
+              </p>
+            )}
             {!sensor.sensorOnline && (
               <p className="text-xs mt-1 font-medium" style={{ color: "#E67E22" }}>
                 Sensor not responding — data may be stale
@@ -214,7 +216,7 @@ export default function SpotDetailPanel({
                   style={{ maxHeight: "240px", objectFit: "cover" }}
                 />
                 <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
-                  Reference photo · Spot {spotId}
+                  Spot {spotId}
                 </p>
               </div>
             ) : (

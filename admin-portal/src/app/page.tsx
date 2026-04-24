@@ -71,9 +71,17 @@ export default function DashboardPage() {
             total={stats.handicapTotal}
             color={COLORS.handicap}
             icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.handicap} strokeWidth="2">
-                <circle cx="12" cy="4" r="2" />
-                <path d="M12 6v6m-4 8a4 4 0 108 0" />
+              // Wheelchair-person profile — matches the icon drawn on
+              // each handicap spot tile in the parking map.
+              <svg width="16" height="16" viewBox="0 0 100 100">
+                <g stroke={COLORS.handicap} strokeLinecap="round" fill="none">
+                  <circle cx="62" cy="18" r="10" fill={COLORS.handicap} stroke="none" />
+                  <line x1="57" y1="30" x2="50" y2="56" strokeWidth="10" />
+                  <line x1="58" y1="36" x2="80" y2="42" strokeWidth="9" />
+                  <line x1="46" y1="58" x2="68" y2="58" strokeWidth="9" />
+                  <line x1="68" y1="58" x2="82" y2="72" strokeWidth="9" />
+                  <circle cx="42" cy="72" r="22" strokeWidth="8" />
+                </g>
               </svg>
             }
           />

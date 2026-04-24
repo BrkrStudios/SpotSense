@@ -14,6 +14,8 @@ import {
   SPOTS_PER_ROW,
   HANDICAP_POSITIONS,
   TOTAL_NUMBERED_SPOTS,
+  NOT_A_SPOT_POSITIONS,
+  GRASS_POSITIONS,
 } from "@/lib/constants";
 import { getMockParkingData, getMockAlerts } from "@/lib/mock-data";
 import { spotNumberForPosition } from "@/lib/utils";
@@ -219,7 +221,7 @@ function computeStats(data: ParkingLotData): ParkingStats {
   }
 
   return {
-    totalSpots: TOTAL_NUMBERED_SPOTS,
+    totalSpots: TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length,
     available,
     occupied,
     handicapTotal: HANDICAP_POSITIONS.length,
@@ -244,7 +246,7 @@ function buildLiveHistory(
 
   const dayOfWeek = serverTime.getDay(); // 0=Sun, 1=Mon, ...
   const profile = DAY_PROFILES[dayOfWeek];
-  const usableSpots = TOTAL_NUMBERED_SPOTS;
+  const usableSpots = TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length;
 
   let seed = startOfDay.getTime() % 2147483647;
   const seededRand = () => {

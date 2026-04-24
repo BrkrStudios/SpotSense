@@ -57,7 +57,9 @@ function coerceReading(raw: Record<string, unknown>): TemperatureReading | null 
     deviceId,
     temperature: celsiusToFahrenheit(temperatureC),
     mode: modeLower as ClimateMode,
-    power,
+    // Firmware reports power in deciwatts (e.g. "55" = 5.5 W). Scale to
+    // watts at the boundary so the rest of the app deals in W.
+    power: power / 10,
     timestamp,
   };
 }

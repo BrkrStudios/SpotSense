@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SensorReading, ParkingSpot } from "@/lib/types";
 import { spotColor, relativeTime } from "@/lib/utils";
+import { isRealSpot } from "@/lib/sensor-config";
 
 interface SensorListRowProps {
   spotId: number;
@@ -12,6 +13,7 @@ interface SensorListRowProps {
 
 export default function SensorListRow({ spotId, spot, sensor }: SensorListRowProps) {
   const color = spotColor(spot);
+  const hideTimestamp = isRealSpot(spotId);
   const battery = sensor.batteryPercent;
   const batteryColor =
     battery === null ? "var(--text-secondary)" : battery < 20 ? "#D92626" : battery < 40 ? "#F59E0B" : "#33BF4D";
@@ -64,7 +66,7 @@ export default function SensorListRow({ spotId, spot, sensor }: SensorListRowPro
         </span>
 
         <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-          {relativeTime(sensor.lastUpdated)}
+          {hideTimestamp ? "—" : relativeTime(sensor.lastUpdated)}
         </span>
 
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2">
