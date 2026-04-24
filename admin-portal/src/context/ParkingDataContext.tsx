@@ -221,12 +221,7 @@ function computeStats(data: ParkingLotData): ParkingStats {
   }
 
   return {
-    // Total reflects the numbering scheme: spots are numbered 1..308
-    // so the user-facing total is 308. The 25 grass/bollard cells get
-    // counted in this total but never contribute to available/occupied
-    // buckets (so the two sub-counts don't sum to the total — that's
-    // intentional and matches the iOS app).
-    totalSpots: TOTAL_NUMBERED_SPOTS,
+    totalSpots: TOTAL_NUMBERED_SPOTS - NOT_A_SPOT_POSITIONS.length - GRASS_POSITIONS.length,
     available,
     occupied,
     handicapTotal: HANDICAP_POSITIONS.length,
