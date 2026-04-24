@@ -67,3 +67,26 @@ export function isRealSpotPosition(row: number, col: number): boolean {
 export function getRealSpotByNumber(spotNumber: number): RealSpotConfig | undefined {
   return REAL_SPOTS.find((s) => s.spotNumber === spotNumber);
 }
+
+/**
+ * Ordered list of demo reference photos served from /public/spots/.
+ * Used as placeholder camera snapshots for simulated (non-real) spots.
+ * Four images cycle by spotId so adjacent spots show different cars.
+ */
+const DEMO_IMAGES = [
+  "/spots/demo-1.jpg",
+  "/spots/demo-2.jpg",
+  "/spots/demo-3.jpg",
+  "/spots/demo-4.jpg",
+] as const;
+
+/**
+ * Returns the demo image path for a simulated spot, or null if the spot
+ * is a real hardware spot (those use their own staticImageOverride).
+ * The image is chosen by `spotId % DEMO_IMAGES.length` so the cars
+ * alternate predictably — same spot always gets the same car.
+ */
+export function getDemoImageForSpot(spotId: number): string | null {
+  if (isRealSpot(spotId)) return null;
+  return DEMO_IMAGES[spotId % DEMO_IMAGES.length];
+}

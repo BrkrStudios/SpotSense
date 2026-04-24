@@ -5,7 +5,7 @@ import Link from "next/link";
 import Header from "@/components/layout/Header";
 import { positionForSpotNumber, spotColor, relativeTime } from "@/lib/utils";
 import { SpotStatus, SensorReading } from "@/lib/types";
-import { isRealSpot, getRealSpotByNumber } from "@/lib/sensor-config";
+import { isRealSpot, getRealSpotByNumber, getDemoImageForSpot } from "@/lib/sensor-config";
 import { useParkingData } from "@/context/ParkingDataContext";
 
 export default function SensorDetailPage({
@@ -214,37 +214,50 @@ export default function SensorDetailPage({
                       </div>
                     )
               */}
-              {realSpotConfig?.staticImageOverride ? (
-                <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
-                  <img
-                    src={realSpotConfig.staticImageOverride}
-                    alt={`Spot ${spotId} reference photo`}
-                    className="w-full h-auto rounded-lg"
-                    style={{ maxHeight: "300px", objectFit: "cover" }}
-                  />
-                  <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
-                    Spot {spotId}
-                  </p>
-                </div>
-              ) : (
-                <div
-                  className="w-full aspect-video rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: "var(--surface)" }}
-                >
-                  <div className="text-center">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" className="mx-auto mb-2">
-                      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                      <circle cx="12" cy="13" r="4" />
-                    </svg>
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      No snapshot available
-                    </p>
-                    <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
-                      ArduCamera activates after 3 consecutive TOF detections
-                    </p>
+              {(() => {
+                // 1) Real hardware spots → their specific override photo.
+                // 2) Simulated spots that are ONLINE → cycle through 4 demo
+                //    reference photos so the spot detail view always has
+                //    something to show during the presentation.
+                // 3) Offline sensors → "No image available" placeholder so
+                //    it's obvious no fresh image is expected.
+                const overrideSrc = realSpotConfig?.staticImageOverride;
+                const demoSrc = displaySensor.sensorOnline
+                  ? getDemoImageForSpot(spotId)
+                  : null;
+                const src = overrideSrc ?? demoSrc;
+                if (src) {
+                  return (
+                    <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
+                      <img
+                        src={src}
+                        alt={`Spot ${spotId} reference photo`}
+                        className="w-full h-auto rounded-lg"
+                        style={{ maxHeight: "300px", objectFit: "cover" }}
+                      />
+                      <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
+                        Spot {spotId}
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    className="w-full aspect-video rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: "var(--surface)" }}
+                  >
+                    <div className="text-center">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" className="mx-auto mb-2">
+                        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                      <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                        No image available
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </Card>
 
             {/* Position */}

@@ -2,7 +2,7 @@
 
 import { SensorReading, ParkingSpot, SpotStatus } from "@/lib/types";
 import { spotColor, relativeTime } from "@/lib/utils";
-import { getRealSpotByNumber, isRealSpot } from "@/lib/sensor-config";
+import { getRealSpotByNumber, isRealSpot, getDemoImageForSpot } from "@/lib/sensor-config";
 
 interface SpotDetailPanelProps {
   spotId: number;
@@ -207,31 +207,43 @@ export default function SpotDetailPanel({
                     </div>
                   )
             */}
-            {getRealSpotByNumber(spotId)?.staticImageOverride ? (
-              <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
-                <img
-                  src={getRealSpotByNumber(spotId)!.staticImageOverride}
-                  alt={`Spot ${spotId} reference photo`}
-                  className="w-full h-auto rounded-lg"
-                  style={{ maxHeight: "240px", objectFit: "cover" }}
-                />
-                <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
-                  Spot {spotId}
-                </p>
-              </div>
-            ) : (
-              <div
-                className="w-full aspect-video rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: "var(--surface)" }}
-              >
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--text-secondary)" }}
+            {(() => {
+              // Same image-source rules as the Sensor detail page:
+              //   real spot override → demo image (if online) → placeholder.
+              const overrideSrc = getRealSpotByNumber(spotId)?.staticImageOverride;
+              const demoSrc = sensor.sensorOnline
+                ? getDemoImageForSpot(spotId)
+                : null;
+              const src = overrideSrc ?? demoSrc;
+              if (src) {
+                return (
+                  <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
+                    <img
+                      src={src}
+                      alt={`Spot ${spotId} reference photo`}
+                      className="w-full h-auto rounded-lg"
+                      style={{ maxHeight: "240px", objectFit: "cover" }}
+                    />
+                    <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
+                      Spot {spotId}
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div
+                  className="w-full aspect-video rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: "var(--surface)" }}
                 >
-                  No snapshot available
-                </span>
-              </div>
-            )}
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    No image available
+                  </span>
+                </div>
+              );
+            })()}
           </Section>
 
           {/* Battery */}
