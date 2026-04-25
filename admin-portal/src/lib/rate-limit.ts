@@ -1,17 +1,15 @@
 /**
- * In-memory rate limiter for auth endpoints.
+ * Per-IP rate limiter for auth endpoints.
  *
- * Tracks failed attempts per IP. After MAX_ATTEMPTS failures inside a
- * rolling WINDOW, the IP is locked out for LOCKOUT_MS. A successful
- * authentication clears the bucket.
+ * After MAX_ATTEMPTS failures inside a rolling WINDOW, an IP is locked
+ * out for LOCKOUT_MS. A successful authentication clears that IP's
+ * bucket.
  *
- * Memoized on globalThis so Next.js HMR in dev doesn't reset the counter
- * every file save — same trick the parking simulation uses.
- *
- * In-memory is deliberate: the admin portal runs as a single Railway
- * instance, and an attacker can't predict a restart. A database-backed
- * store would be overkill for the demo. If this ever scales horizontally,
- * swap the Map for Redis.
+ * State lives in a Map on globalThis so Next.js HMR in dev doesn't wipe
+ * counters on every hot-reload (same pattern the parking simulation uses).
+ * The portal currently runs as a single Node process on Railway, so an
+ * in-memory Map is fine; swap for Redis if this ever scales to more
+ * than one instance.
  */
 
 import type { NextRequest } from "next/server";

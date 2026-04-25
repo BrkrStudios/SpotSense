@@ -182,50 +182,18 @@ export default function SensorDetailPage({
               </div>
             </Card>
 
-            {/* Camera */}
+            {/*
+              Camera snapshot card. Priority:
+                1. Free spot → placeholder (real cameras only fire on
+                   consecutive TOF hits, so an empty spot has no photo).
+                2. Real hardware spot + occupied + Firebase sent an
+                   imagePath → live snapshot from Firebase.
+                3. Simulated spot + occupied + sensor online → rotating
+                   demo photo from /public/spots/.
+                4. Occupied but nothing available → "No image" placeholder.
+            */}
             <Card title="Camera Snapshot">
-              {/*
-                Image source:
-                  - realSpotConfig.staticImageOverride wins when set.
-                    Drop the file under /public/spots/... and point the
-                    config at it (see sensor-config.ts).
-                  - Live Firebase snapshot path is DISABLED for demo.
-                    To restore: delete the staticImageOverride for this
-                    spot in sensor-config.ts, then swap the first branch
-                    back to the block below:
-
-                    displaySensor.cameraSnapshotUrl ? (
-                      <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
-                        <img
-                          src={displaySensor.cameraSnapshotUrl}
-                          alt={`Spot ${spotId} camera snapshot`}
-                          className="w-full h-auto rounded-lg"
-                          style={{
-                            maxHeight: "300px",
-                            objectFit: "cover",
-                            transform: realSpotConfig?.imageRotationDegrees
-                              ? `rotate(${realSpotConfig.imageRotationDegrees}deg)`
-                              : undefined,
-                          }}
-                        />
-                        <p className="text-[10px] px-3 py-2 text-center" style={{ color: "var(--text-secondary)" }}>
-                          Live from {realSpotConfig?.deviceId ?? "sensor"} · Updated {relativeTime(displaySensor.lastUpdated)}
-                        </p>
-                      </div>
-                    )
-              */}
               {(() => {
-                // Image source rules (admin portal only — iOS app renders
-                // its own way from /api/parking):
-                //   1. Spot is FREE → no photo. If you can see the spot
-                //      is available, you don't need a picture of an empty
-                //      parking space. Shows a "No image — spot is free"
-                //      placeholder instead.
-                //   2. Real hardware spot + occupied → staticImageOverride.
-                //   3. Simulated spot + occupied + sensor online → cycle
-                //      through the 4 demo photos.
-                //   4. Sensor offline (occupied per last known state) →
-                //      "No image available" placeholder.
                 const isOccupied = spot.status === SpotStatus.Occupied;
                 if (!isOccupied) {
                   return (
@@ -244,17 +212,17 @@ export default function SensorDetailPage({
                     </div>
                   );
                 }
-                const overrideSrc = realSpotConfig?.staticImageOverride;
+                const liveSrc = displaySensor.cameraSnapshotUrl;
                 const demoSrc = displaySensor.sensorOnline
                   ? getDemoImageForSpot(spotId)
                   : null;
-                const src = overrideSrc ?? demoSrc;
+                const src = liveSrc ?? demoSrc;
                 if (src) {
                   return (
                     <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
                       <img
                         src={src}
-                        alt={`Spot ${spotId} reference photo`}
+                        alt={`Spot ${spotId} camera snapshot`}
                         className="w-full h-auto rounded-lg"
                         style={{ maxHeight: "300px", objectFit: "cover" }}
                       />

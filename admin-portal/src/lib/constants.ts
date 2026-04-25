@@ -1,4 +1,14 @@
-// Layout dimensions — 1:1 match from iOS ParkingLotLayout
+/**
+ * Parking lot geometry + palette.
+ *
+ * The layout dimensions mirror the iOS ParkingLotLayout struct so
+ * both clients render the same shape of lot. The grid is 14 parking
+ * rows by 22 columns (= 308 cells), with a subset of cells marked as
+ * grass or not-a-spot (light-pole / curb cuts). Spot numbering in
+ * utils.ts assigns 1..308 by walking the grid row-major.
+ */
+
+// Layout dimensions — 1:1 match from iOS ParkingLotLayout.
 export const SPOT_WIDTH = 28;
 export const SPOT_HEIGHT = 48;
 export const LINE_WIDTH = 1.5;

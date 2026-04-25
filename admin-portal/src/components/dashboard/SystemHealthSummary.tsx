@@ -68,10 +68,11 @@ export default function SystemHealthSummary({
           </div>
         </div>
 
-        {/* Climate — numbers reported by the parking sensor itself
-            (heatsink / enclosure temp + HVAC draw of the Pi unit), NOT
-            ambient air temperature. Clearly labeled so nobody confuses
-            this with "current weather". */}
+        {/*
+          Climate subsection. Values come from the Pi's own enclosure
+          temperature / HVAC reading, not outdoor weather. The header
+          copy calls that out so the numbers aren't misread.
+        */}
         <div className="pt-4 border-t" style={{ borderColor: "var(--border)" }}>
           <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: "var(--text-secondary)" }}>
             Parking Sensor Climate

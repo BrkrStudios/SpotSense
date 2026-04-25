@@ -1,16 +1,13 @@
 /**
  * Server-side authentication primitives.
+ *   - Verify username + bcrypt password hash.
+ *   - Issue/verify signed JWT session cookies (HS256 via `jose`).
  *
- * Responsibilities:
- *   - Verify username + bcrypt password hash
- *   - Issue/verify signed JWT session cookies (jose, HS256)
- *
- * Security notes:
- *   - The admin password is NEVER stored in plaintext. Only a bcrypt hash
- *     (cost 12) of "hcuspot26" lives in this file.
- *   - Session cookies are HttpOnly + SameSite=Lax + signed. The signing
- *     secret defaults to a baked-in 32-byte value for demo convenience but
- *     should be overridden via AUTH_SESSION_SECRET in production.
+ * The admin password is stored only as a bcrypt hash (cost 12) — no
+ * plaintext lives in the repo. Session cookies are HttpOnly,
+ * SameSite=Lax, and signed with AUTH_SESSION_SECRET. A fallback
+ * secret is hard-coded so local dev works out of the box; production
+ * must set AUTH_SESSION_SECRET to a fresh 32-byte random value.
  */
 
 import { SignJWT, jwtVerify } from "jose";
@@ -39,7 +36,9 @@ export async function verifyPassword(
   password: string
 ): Promise<boolean> {
   if (username !== ADMIN_USERNAME) {
-    // Still run a dummy compare to blunt username-enumeration timing attacks.
+    // Run a dummy compare anyway so the response time for an unknown
+    // username matches the response time for a wrong password. Prevents
+    // username enumeration by timing.
     await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
     return false;
   }

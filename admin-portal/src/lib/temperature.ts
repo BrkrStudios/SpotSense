@@ -1,25 +1,18 @@
 /**
- * Server-side access to the `temperature_readings` Firestore collection.
+ * Read helpers for the `temperature_readings` Firestore collection.
  *
- * Firmware doc shape (what the Pi actually writes):
- *   { deviceId: string,
- *     temperature: number  (Celsius),
- *     mode: "HEATING" | "COOLING"  (uppercase),
- *     power: number (W),
- *     timestamp: string (ISO, e.g. "2026-04-18T17:13:45.788914+00:00") }
+ * Firmware doc shape:
+ *   {
+ *     deviceId:    string,
+ *     temperature: number (°C),
+ *     mode:        "HEATING" | "COOLING",
+ *     power:       number (deciwatts),
+ *     timestamp:   ISO 8601 string,
+ *   }
  *
- * Our internal TemperatureReading is normalized:
- *   - temperature → Fahrenheit (converted at the boundary here)
- *   - mode       → lowercase "heating" | "cooling"
- *
- * This keeps the UI agnostic of firmware quirks — if a future firmware
- * version starts emitting Fahrenheit or lowercase modes, only this file
- * needs to change.
- *
- * Mirrors the approach in firebase.ts::fetchLatestReadings: equality-only
- * query, client-side dedup-by-deviceId picking the latest timestamp,
- * defensive validation, and a deterministic mock fallback when the
- * collection is empty (demo / Firebase unreachable).
+ * Internal TemperatureReading is normalized — °C converted to °F,
+ * modes lowercased, power scaled to watts. The rest of the app never
+ * touches the raw firmware values.
  */
 
 import { getDb } from "./firebase";
@@ -67,18 +60,12 @@ function coerceReading(raw: Record<string, unknown>): TemperatureReading | null 
 /**
  * Pull the latest reading per device from `temperature_readings`.
  *
- * Strategy: ask Firestore for the most recent RECENT_DOC_LIMIT docs sorted
- * by timestamp descending, then keep the first reading we see per deviceId
- * (which is guaranteed to be the newest for that device because of the
- * server-side sort). This is both:
+ * Query pulls the N most recent docs sorted by timestamp descending
+ * and keeps the first reading encountered per deviceId. Because the
+ * sort is server-side, the first hit for a deviceId is guaranteed to
+ * be the newest reading for that device.
  *
- *   - Correct: we never accidentally surface a stale reading if a later
- *     one exists for the same device.
- *   - Cheap: a single indexed query with a hard ceiling, instead of a
- *     full collection scan that grows with history.
- *
- * Falls through to the mock dataset on error or when nothing comes back
- * so the dashboard stays useful in demo mode.
+ * Falls back to the mock dataset on error or empty result.
  */
 const RECENT_DOC_LIMIT = 500;
 

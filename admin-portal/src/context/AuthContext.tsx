@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * AuthContext
+ *
+ * Lightweight client-side wrapper around the `/api/auth/me` endpoint.
+ * Fetches the signed-in user on mount and exposes `refresh()` +
+ * `logout()` to other components. The actual session is a signed
+ * HttpOnly JWT cookie enforced by `src/middleware.ts`; this context
+ * only surfaces who the browser *thinks* is logged in for rendering
+ * the avatar/sign-out UI.
+ */
+
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 
 export interface CurrentUser {

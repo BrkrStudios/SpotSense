@@ -176,45 +176,17 @@ export default function SpotDetailPanel({
             </p>
           </Section>
 
-          {/* Camera Snapshot */}
+          {/*
+            Camera snapshot section. Mirrors the priority used on the
+            full sensor detail page:
+              1. Free spot → placeholder (cameras only fire when a spot
+                 fills, so there's no photo to show).
+              2. Real spot + live Firebase snapshot URL → that URL.
+              3. Simulated spot + online → rotating demo photo.
+              4. Occupied with nothing available → generic "No image".
+          */}
           <Section title="Camera Snapshot">
-            {/*
-              Image source:
-                - realSpotConfig.staticImageOverride wins when set
-                  (see sensor-config.ts). Drop the file under /public/spots/.
-                - Live Firebase snapshot path is DISABLED for demo.
-                  To restore: delete the staticImageOverride for this
-                  spot in sensor-config.ts, then swap the first branch
-                  back to the block below:
-
-                  sensor.cameraSnapshotUrl ? (
-                    <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
-                      <img
-                        src={sensor.cameraSnapshotUrl}
-                        alt={`Spot ${spotId} camera snapshot`}
-                        className="w-full h-auto rounded-lg"
-                        style={{
-                          maxHeight: "240px",
-                          objectFit: "cover",
-                          transform: getRealSpotByNumber(spotId)?.imageRotationDegrees
-                            ? `rotate(${getRealSpotByNumber(spotId)!.imageRotationDegrees}deg)`
-                            : undefined,
-                        }}
-                      />
-                      <p className="text-[10px] px-2 py-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
-                        Live from {getRealSpotByNumber(spotId)?.deviceId ?? "sensor"} · Updated {relativeTime(sensor.lastUpdated)}
-                      </p>
-                    </div>
-                  )
-            */}
             {(() => {
-              // Same image-source rules as the Sensor detail page:
-              //   1. Free spot → no photo, "Spot is free" placeholder.
-              //   2. Occupied + real spot override → override photo.
-              //   3. Occupied + simulated + online → demo photo.
-              //   4. Occupied + offline → "No image available" placeholder.
-              // (iOS renders independently from /api/parking so this is
-              // display-only and doesn't leak back to the app.)
               const isOccupied = spot.status === SpotStatus.Occupied;
               if (!isOccupied) {
                 return (
@@ -233,17 +205,17 @@ export default function SpotDetailPanel({
                   </div>
                 );
               }
-              const overrideSrc = getRealSpotByNumber(spotId)?.staticImageOverride;
+              const liveSrc = sensor.cameraSnapshotUrl;
               const demoSrc = sensor.sensorOnline
                 ? getDemoImageForSpot(spotId)
                 : null;
-              const src = overrideSrc ?? demoSrc;
+              const src = liveSrc ?? demoSrc;
               if (src) {
                 return (
                   <div className="w-full rounded-lg overflow-hidden" style={{ backgroundColor: "var(--surface)" }}>
                     <img
                       src={src}
-                      alt={`Spot ${spotId} reference photo`}
+                      alt={`Spot ${spotId} camera snapshot`}
                       className="w-full h-auto rounded-lg"
                       style={{ maxHeight: "240px", objectFit: "cover" }}
                     />

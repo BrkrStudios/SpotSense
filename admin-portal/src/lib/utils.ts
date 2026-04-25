@@ -7,9 +7,10 @@ import {
 import { SpotStatus, ParkingSpot } from "./types";
 
 /**
- * Spot numbers use grid-index math (1..308) to match the iOS app.
- * Grass and bollard cells still get numbers; those positions are
- * masked off in the grid render (shown as hatching / grass green).
+ * Spot numbers are assigned by grid index: parkingRowIndex * 22 + col + 1,
+ * giving a 1..308 range across the 14 parking rows × 22 columns. Grass
+ * islands and light-pole cells also get numbers; they're rendered with
+ * hatching or green in the grid so the user sees a gap, not a spot.
  */
 export function positionForSpotNumber(
   spotNumber: number
@@ -22,6 +23,7 @@ export function positionForSpotNumber(
   return { row, col };
 }
 
+/** Inverse of positionForSpotNumber. Returns null for lane/driving rows. */
 export function spotNumberForPosition(row: number, col: number): number | null {
   const parkingRowIndex = PARKING_ROW_INDICES.indexOf(row);
   if (parkingRowIndex === -1) return null;

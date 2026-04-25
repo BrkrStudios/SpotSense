@@ -14,9 +14,8 @@ import { useParkingData } from "@/context/ParkingDataContext";
 import { generateHistoricalData, computeWeeklyStats } from "@/lib/mock-data";
 import { DAY_NAMES } from "@/lib/occupancy-profiles";
 
-// Fixed threshold for Camera Power Savings estimate.
-// Previously configurable via /api/config; now baked in since the config page
-// no longer exposes polling/threshold controls.
+// Number of consecutive TOF hits required before the camera fires.
+// Only consumed by the Camera Power Savings card.
 const CAMERA_THRESHOLD_DEFAULT = 5;
 
 export default function AnalyticsPage() {

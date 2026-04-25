@@ -1,3 +1,15 @@
+/**
+ * Edge middleware that gates every request with the session cookie.
+ *
+ * Runs before any page or API handler. Three outcomes:
+ *   1. Path is in PUBLIC_PATHS (login, login submission) → passes through.
+ *   2. Path is under API_KEY_PROTECTED_PREFIXES (e.g. /api/parking) →
+ *      passes through so those routes can enforce their own x-api-key
+ *      check (used by the iOS app).
+ *   3. Everything else → verify the `spotsense_session` JWT. On failure,
+ *      API routes return 401 JSON, page routes redirect to /login.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 

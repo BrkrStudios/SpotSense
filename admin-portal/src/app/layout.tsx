@@ -1,3 +1,11 @@
+/**
+ * Root layout — wraps every page in the Inter font, the persistent
+ * SettingsProvider (theme + accent + prefs), and the AppShell
+ * (sidebar nav + main content frame). AppShell decides at runtime
+ * whether to render the sidebar so the /login page can render
+ * standalone without it.
+ */
+
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";

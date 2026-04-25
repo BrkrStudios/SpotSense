@@ -1,5 +1,19 @@
 "use client";
 
+/**
+ * SettingsContext
+ *
+ * Stores every user-facing preference (theme, accent color, density,
+ * alert filters, etc.) in localStorage and applies the active choices
+ * to the document root as CSS custom properties. Non-"use client"
+ * components read the CSS vars directly; "use client" components read
+ * the typed `Settings` object via `useSettings()`.
+ *
+ * Shape is versioned through the STORAGE_KEY constant so a breaking
+ * change to Settings can bump the key and ignore stale values instead
+ * of crashing on a missing field.
+ */
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 export type Theme = "dark" | "light";

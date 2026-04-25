@@ -8,7 +8,7 @@ import { SensorReading, SpotStatus } from "./types";
 import { fetchLatestReadings } from "./firebase";
 import { REAL_SPOTS } from "./sensor-config";
 
-// Re-export everything from sensor-config for server-side consumers
+// Re-export client-safe pieces so server code only needs one import path.
 export {
   REAL_SPOTS,
   REAL_SPOT_IDS,
@@ -30,6 +30,9 @@ interface RawSensorEntry {
   timestamp: string;
 }
 
+// Static snapshot used when Firestore is down so the page still renders.
+// Values are old on purpose — the live readings in production should
+// always win the "latest timestamp" comparison over these.
 const EMBEDDED_SENSOR_DATA: RawSensorEntry[] = [
   // A12 readings (spotsense-zero-001)
   { spotId: "A12", deviceId: "spotsense-zero-001", occupied: true,  distanceMm: 113, timestamp: "2026-03-24T23:48:23.371761+00:00" },
@@ -48,9 +51,14 @@ const EMBEDDED_SENSOR_DATA: RawSensorEntry[] = [
 /* ------------------------------------------------------------------ */
 
 /**
- * Fetch real sensor data for ALL real spots.
- * Tries Firebase first, falls back to embedded data if Firestore is unreachable.
- * Returns a Record keyed by spot number.
+ * Fetch the latest reading for every real (hardware) spot.
+ * Tries Firestore first; if the query throws (offline, auth issue, etc.)
+ * we degrade to the embedded snapshot above so the dashboard still
+ * renders something sensible.
+ *
+ * Returns a map keyed by the internal spotNumber (e.g. 245, 267) so
+ * callers can merge the result straight into simulation state without
+ * needing to know about firebaseSpotId strings.
  */
 export async function getRealSpotsData(): Promise<
   Record<number, { status: SpotStatus; sensor: SensorReading }>
@@ -74,7 +82,8 @@ export async function getRealSpotsData(): Promise<
     }
   } catch (err) {
     console.error("[sensor] Firebase fetch failed, using embedded fallback:", err);
-    // Build readings from embedded data — pick latest per spotId
+    // Rebuild readings from the embedded snapshot; keep the newest
+    // timestamp per spotId so the shape matches a live read.
     readings = {};
     for (const entry of EMBEDDED_SENSOR_DATA) {
       const existing = readings[entry.spotId];
@@ -88,61 +97,15 @@ export async function getRealSpotsData(): Promise<
     }
   }
 
-  // Map Firebase readings to our real spot configs
   for (const config of REAL_SPOTS) {
-    // DEMO OVERRIDE — spot 267 is hard-pinned to "free" for the
-    // presentation. The TOF distance is synthesized at the top of the
-    // sensor's clear-path range so the reading is internally consistent
-    // with an Available status. The real Firebase read for B12 is
-    // commented out below — remove the override block + un-comment the
-    // real read to go back to live data.
-    if (config.spotNumber === 267) {
-      result[config.spotNumber] = {
-        status: SpotStatus.Available,
-        sensor: {
-          spotId: config.spotNumber,
-          row: config.row,
-          col: config.col,
-          distanceMm: 1500, // clear path — nothing parked
-          objectDetected: false,
-          cameraSnapshotUrl: null,
-          lastUpdated: new Date().toISOString(),
-          batteryPercent: null,
-          sensorOnline: true,
-          consecutiveDetections: 0,
-        },
-      };
-      continue;
-
-      // --- Live Firebase path for spot 267 (disabled for demo) ---
-      // const reading = readings[config.firebaseSpotId];
-      // if (!reading) continue;
-      // const isOccupied = reading.occupied;
-      // let snapshotUrl: string | null = null;
-      // if (reading.imagePath && reading.deviceId === config.deviceId) {
-      //   snapshotUrl = reading.imagePath;
-      // }
-      // result[config.spotNumber] = {
-      //   status: isOccupied ? SpotStatus.Occupied : SpotStatus.Available,
-      //   sensor: {
-      //     spotId: config.spotNumber, row: config.row, col: config.col,
-      //     distanceMm: reading.distanceMm ?? 0,
-      //     objectDetected: isOccupied,
-      //     cameraSnapshotUrl: snapshotUrl,
-      //     lastUpdated: reading.timestamp,
-      //     batteryPercent: null,
-      //     sensorOnline: true,
-      //     consecutiveDetections: isOccupied ? 5 : 0,
-      //   },
-      // };
-    }
-
     const reading = readings[config.firebaseSpotId];
     if (!reading) continue;
 
     const isOccupied = reading.occupied;
 
-    // Only use the image if it came from the correct Pi for this spot
+    // Accept the uploaded image only if the deviceId on the doc matches
+    // the Pi assigned to this spot. Defends against a cross-wired upload
+    // showing the wrong car on the wrong spot.
     let snapshotUrl: string | null = null;
     if (reading.imagePath && reading.deviceId === config.deviceId) {
       snapshotUrl = reading.imagePath;

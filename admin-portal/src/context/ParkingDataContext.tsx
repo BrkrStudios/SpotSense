@@ -1,5 +1,18 @@
 "use client";
 
+/**
+ * ParkingDataContext
+ *
+ * One place for every UI surface that needs parking state. Polls the
+ * server `/api/parking` endpoint every 3 seconds (the server runs the
+ * simulation and merges Firebase readings for the two real spots),
+ * then derives stats, alerts, activity feed, and heatmap totals and
+ * pushes them into a React context.
+ *
+ * Consumers include the Dashboard stat cards, the Parking Map grid,
+ * the Sensors list, and the Alerts page.
+ */
+
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import {
   ParkingLotData,
